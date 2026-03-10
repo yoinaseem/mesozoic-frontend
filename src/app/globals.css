@@ -1,26 +1,151 @@
 @import "tailwindcss";
 
+/* ================================
+   THEME VARIABLES
+================================ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Backgrounds */
+  --color-bg: #f5f5f4;
+  --color-surface: #ffffff;
+
+  /* Brand */
+  --color-primary: #2f6f4e;
+  --color-secondary: #4b5563;
+  --color-accent: #f59e0b;
+
+  /* Text */
+  --color-text: #111827;
+  --color-text-muted: #6b7280;
+
+  /* Borders */
+  --color-border: #e5e7eb;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* Dark mode */
+.dark {
+  --color-bg: #0f172a;
+  --color-surface: #1e293b;
+
+  --color-primary: #3c8d63;
+  --color-secondary: #94a3b8;
+  --color-accent: #fbbf24;
+
+  --color-text: #f3f4f6;
+  --color-text-muted: #9ca3af;
+
+  --color-border: #334155;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ================================
+   BASE STYLES
+================================ */
+
+@layer base {
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+  }
+
+  a {
+    color: var(--color-primary);
+    text-decoration: none;
+  }
+
+  a:hover {
+    opacity: 0.85;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ================================
+   UTILITY CLASSES
+================================ */
+
+@layer utilities {
+  /* Backgrounds */
+
+  .bg-base {
+    background-color: var(--color-bg);
+  }
+
+  .bg-surface {
+    background-color: var(--color-surface);
+  }
+
+  .bg-primary {
+    background-color: var(--color-primary);
+  }
+
+  .bg-secondary {
+    background-color: var(--color-secondary);
+  }
+
+  .bg-accent {
+    background-color: var(--color-accent);
+  }
+
+  /* Text */
+
+  .text-base-color {
+    color: var(--color-text);
+  }
+
+  .text-muted {
+    color: var(--color-text-muted);
+  }
+
+  .text-primary {
+    color: var(--color-primary);
+  }
+
+  .text-secondary {
+    color: var(--color-secondary);
+  }
+
+  .text-accent {
+    color: var(--color-accent);
+  }
+
+  /* Borders */
+
+  .border-base {
+    border-color: var(--color-border);
+  }
+
+  /* Cards */
+
+  .card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+  }
+
+  /* Buttons */
+
+  .btn-primary {
+    background-color: var(--color-primary);
+    color: white;
+    padding: 0.6rem 1.2rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    transition: opacity 0.2s;
+  }
+
+  .btn-primary:hover {
+    opacity: 0.9;
+  }
+
+  .btn-accent {
+    background-color: var(--color-accent);
+    color: black;
+    padding: 0.6rem 1.2rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    transition: opacity 0.2s;
+  }
+
+  .btn-accent:hover {
+    opacity: 0.9;
+  }
 }
