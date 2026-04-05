@@ -1,5 +1,11 @@
 import HeroBanner from "@/components/home/HeroBanner";
 
-export default function Home() {
-  return <HeroBanner />;
-}
+const Home = () => {
+  return (
+    <>
+      <HeroBanner />
+    </>
+  );
+};
+
+export default Home;
