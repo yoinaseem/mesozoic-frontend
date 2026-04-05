@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { authFieldClass } from "@/components/auth/auth-fields";
 
 export function LoginForm() {
   return (
@@ -23,7 +22,7 @@ export function LoginForm() {
             autoComplete="email"
             required
             placeholder="you@example.com"
-            className={`mt-1 ${authFieldClass}`}
+            className="mt-1 w-full rounded-lg border border-base bg-base px-3 py-2.5 text-base text-base-color placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
           />
         </div>
 
@@ -40,7 +39,7 @@ export function LoginForm() {
             type="password"
             autoComplete="current-password"
             required
-            className={`mt-1 ${authFieldClass}`}
+            className="mt-1 w-full rounded-lg border border-base bg-base px-3 py-2.5 text-base text-base-color placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
           />
         </div>
 
