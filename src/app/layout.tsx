@@ -1,4 +1,4 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/context/auth-context";
 import "./globals.css";
@@ -28,10 +28,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh flex flex-col`}
       >
         <Navbar />
-        <AuthProvider>{children}</AuthProvider>
+        <main className="flex min-h-0 flex-1 flex-col">
+          <AuthProvider>{children}</AuthProvider>
+        </main>
         <Footer />
       </body>
     </html>

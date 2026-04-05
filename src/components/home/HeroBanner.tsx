@@ -1,9 +1,6 @@
 import Image from "next/image";
 
-const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1920&q=80&auto=format&fit=crop";
-
-const heroMinHeight = "min-h-screen";
+const heroMinHeight = "min-h-[calc(100dvh+4rem)]";
 
 export default function HeroBanner() {
   return (
@@ -12,7 +9,7 @@ export default function HeroBanner() {
       aria-label="Welcome"
     >
       <Image
-        src={HERO_IMAGE}
+        src="/img/banner.avif"
         alt=""
         fill
         className="z-0 object-cover"

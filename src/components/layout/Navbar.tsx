@@ -15,7 +15,7 @@ const NAVBAR_HEIGHT_PX = 72;
 
 export default function Navbar() {
   const pathname = usePathname();
-  const isHome = pathname === "/";
+  const isHome = pathname === "/welcome";
   const [pastHeroCard, setPastHeroCard] = useState(false);
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export default function Navbar() {
     >
       <div className="max-w-7xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-6">
         <Link
-          href="/"
+          href="/welcome"
           className={
             transparentOnHero
               ? "inline-block border-b-2 border-b-transparent pb-0.5 text-xl font-bold text-white! drop-shadow-md transition-[border-bottom-color,opacity] hover:border-b-white hover:opacity-100!"
