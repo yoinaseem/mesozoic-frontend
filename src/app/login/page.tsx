@@ -10,12 +10,8 @@ export const metadata: Metadata = {
 export default function LoginPage() {
   return (
     <AuthPageLayout variant="login">
-      <div className="card w-full max-w-md self-start">
+      <div className="card w-full max-w-md">
         <h1 className="text-3xl font-bold text-primary">Sign in</h1>
-        <p className="mt-2 text-muted">
-          Welcome back. Enter your details to continue your prehistoric adventure.
-        </p>
-
         <LoginForm />
       </div>
     </AuthPageLayout>

@@ -1,16 +1,79 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { ApiError, getValidationErrors } from "@/lib/api-client";
+import type { FieldErrors } from "@/types/auth";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+
+const inputClass =
+  "mt-1 w-full rounded-lg border border-base bg-base px-3 py-2.5 text-base text-base-color placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]";
+const inputErrorClass =
+  "mt-1 w-full rounded-lg border border-[var(--color-danger)] bg-base px-3 py-2.5 text-base text-base-color placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]";
+
+function resolveNextPath(nextParam: string | null): string {
+  if (!nextParam) {
+    return "/";
+  }
+
+  if (!nextParam.startsWith("/") || nextParam.startsWith("//")) {
+    return "/";
+  }
+
+  return nextParam;
+}
 
 export function LoginForm() {
+  const { login, isAuthenticated, loading } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const nextPath = useMemo(() => resolveNextPath(searchParams.get("next")), [searchParams]);
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [formError, setFormError] = useState("");
+
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      router.replace(nextPath);
+    }
+  }, [isAuthenticated, loading, nextPath, router]);
+
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setFieldErrors({});
+    setFormError("");
+
+    try {
+      await login({ email, password });
+      router.replace(nextPath);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 422) {
+        const validationErrors = getValidationErrors(error);
+        setFieldErrors(validationErrors);
+
+        if (!validationErrors.email?.length && !validationErrors.password?.length) {
+          setFormError("Please review the highlighted fields and try again.");
+        }
+
+        return;
+      }
+
+      if (error instanceof Error && error.message.trim()) {
+        setFormError(error.message);
+        return;
+      }
+
+      setFormError("Unable to sign in right now. Please try again.");
+    }
+  };
+
   return (
     <>
-      <form
-        className="mt-8 space-y-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-        }}
-      >
+      <form className="mt-8 space-y-4" onSubmit={onSubmit}>
         <div>
           <label htmlFor="login-email" className="block text-sm font-medium text-base-color">
             Email
@@ -22,8 +85,15 @@ export function LoginForm() {
             autoComplete="email"
             required
             placeholder="you@example.com"
-            className="mt-1 w-full rounded-lg border border-base bg-base px-3 py-2.5 text-base text-base-color placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+            className={fieldErrors.email?.length ? inputErrorClass : inputClass}
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
           />
+          {fieldErrors.email?.map((error) => (
+            <p className="mt-1 text-sm text-danger" key={error}>
+              {error}
+            </p>
+          ))}
         </div>
 
         <div>
@@ -39,12 +109,21 @@ export function LoginForm() {
             type="password"
             autoComplete="current-password"
             required
-            className="mt-1 w-full rounded-lg border border-base bg-base px-3 py-2.5 text-base text-base-color placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+            className={fieldErrors.password?.length ? inputErrorClass : inputClass}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
           />
+          {fieldErrors.password?.map((error) => (
+            <p className="mt-1 text-sm text-danger" key={error}>
+              {error}
+            </p>
+          ))}
         </div>
 
-        <button type="submit" className="btn-primary mt-2 w-full">
-          Sign in
+        {formError ? <p className="mt-2 text-sm text-danger">{formError}</p> : null}
+
+        <button type="submit" className="btn-primary mt-2 w-full" disabled={loading}>
+          {loading ? "Signing in..." : "Sign in"}
         </button>
       </form>
 

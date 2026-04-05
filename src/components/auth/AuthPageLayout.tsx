@@ -13,9 +13,9 @@ export function AuthPageLayout({ children, variant }: AuthPageLayoutProps) {
 
   return (
     <div className="bg-base flex min-h-screen flex-col">
-      <header className="border-b border-base bg-surface">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <Link href="/" className="text-xl font-bold text-primary">
+      <header className="bg-primary">
+        <div className="mx-auto flex max-w-7xl 2xl:max-w-600 items-center justify-between px-6 py-4">
+          <Link href="/" className="text-xl font-bold text-black">
             Mesozoic Isle
           </Link>
           <nav className="flex items-center gap-6 text-sm">
@@ -29,8 +29,8 @@ export function AuthPageLayout({ children, variant }: AuthPageLayoutProps) {
         </div>
       </header>
 
-      <main className="flex flex-1 flex-col py-16">
-        <div className="mx-auto flex w-full max-w-7xl flex-1 justify-center px-6">
+      <main className="bg-primary flex flex-1 flex-col py-16">
+        <div className="mx-auto flex w-full max-w-7xl flex-1 items-center justify-center px-6">
           {children}
         </div>
       </main>

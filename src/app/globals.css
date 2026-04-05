@@ -20,6 +20,9 @@
 
   /* Borders */
   --color-border: #e5e7eb;
+
+  /* Feedback */
+  --color-danger: #b91c1c;
 }
 
 /* Dark mode */
@@ -35,6 +38,8 @@
   --color-text-muted: #9ca3af;
 
   --color-border: #334155;
+
+  --color-danger: #fca5a5;
 }
 
 /* ================================
@@ -106,6 +111,10 @@
     color: var(--color-accent);
   }
 
+  .text-danger {
+    color: var(--color-danger);
+  }
+
   /* Borders */
 
   .border-base {
@@ -147,5 +156,10 @@
 
   .btn-accent:hover {
     opacity: 0.9;
+  }
+
+  .btn-primary:disabled,
+  .btn-accent:disabled {
+    opacity: 0.6;
   }
 }
