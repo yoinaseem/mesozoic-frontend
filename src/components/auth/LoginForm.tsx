@@ -3,14 +3,10 @@
 import { useAuth } from "@/context/auth-context";
 import { ApiError, getValidationErrors } from "@/lib/api-client";
 import type { FieldErrors } from "@/types/auth";
+import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-
-const inputClass =
-  "mt-1 w-full rounded-lg border border-base bg-base px-3 py-2.5 text-base text-base-color placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]";
-const inputErrorClass =
-  "mt-1 w-full rounded-lg border border-[var(--color-danger)] bg-base px-3 py-2.5 text-base text-base-color placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]";
 
 function resolveNextPath(nextParam: string | null): string {
   if (!nextParam) {
@@ -29,7 +25,10 @@ export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const nextPath = useMemo(() => resolveNextPath(searchParams.get("next")), [searchParams]);
+  const nextPath = useMemo(
+    () => resolveNextPath(searchParams.get("next")),
+    [searchParams],
+  );
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -55,7 +54,10 @@ export function LoginForm() {
         const validationErrors = getValidationErrors(error);
         setFieldErrors(validationErrors);
 
-        if (!validationErrors.email?.length && !validationErrors.password?.length) {
+        if (
+          !validationErrors.email?.length &&
+          !validationErrors.password?.length
+        ) {
           setFormError("Please review the highlighted fields and try again.");
         }
 
@@ -75,22 +77,26 @@ export function LoginForm() {
     <>
       <form className="mt-8 space-y-4" onSubmit={onSubmit}>
         <div>
-          <label htmlFor="login-email" className="block text-sm font-medium text-base-color">
+          <label
+            htmlFor="login-email"
+            className="block text-sm font-medium text-base-color"
+          >
             Email
           </label>
-          <input
+          <Input
             id="login-email"
             name="email"
             type="email"
             autoComplete="email"
             required
             placeholder="you@example.com"
-            className={fieldErrors.email?.length ? inputErrorClass : inputClass}
+            aria-invalid={fieldErrors.email?.length ? true : undefined}
+            className="mt-2"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
           {fieldErrors.email?.map((error) => (
-            <p className="mt-1 text-sm text-danger" key={error}>
+            <p className="mt-2 text-sm text-danger" key={error}>
               {error}
             </p>
           ))}
@@ -98,31 +104,41 @@ export function LoginForm() {
 
         <div>
           <div className="flex items-center justify-between gap-2">
-            <label htmlFor="login-password" className="block text-sm font-medium text-base-color">
+            <label
+              htmlFor="login-password"
+              className="block text-sm font-medium text-base-color"
+            >
               Password
             </label>
             <span className="text-xs text-muted">Forgot password?</span>
           </div>
-          <input
+          <Input
             id="login-password"
             name="password"
             type="password"
             autoComplete="current-password"
             required
-            className={fieldErrors.password?.length ? inputErrorClass : inputClass}
+            aria-invalid={fieldErrors.password?.length ? true : undefined}
+            className="mt-2"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
           />
           {fieldErrors.password?.map((error) => (
-            <p className="mt-1 text-sm text-danger" key={error}>
+            <p className="mt-2 text-sm text-danger" key={error}>
               {error}
             </p>
           ))}
         </div>
 
-        {formError ? <p className="mt-2 text-sm text-danger">{formError}</p> : null}
+        {formError ? (
+          <p className="mt-2 text-sm text-danger">{formError}</p>
+        ) : null}
 
-        <button type="submit" className="btn-primary mt-2 w-full" disabled={loading}>
+        <button
+          type="submit"
+          className="btn-primary mt-2 w-full"
+          disabled={loading}
+        >
           {loading ? "Signing in..." : "Sign in"}
         </button>
       </form>

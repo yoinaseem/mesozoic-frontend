@@ -1,16 +1,9 @@
-import Link from "next/link";
-
 type AuthPageLayoutProps = {
   children: React.ReactNode;
   variant: "login" | "register";
 };
 
-export function AuthPageLayout({ children, variant }: AuthPageLayoutProps) {
-  const alternate =
-    variant === "login"
-      ? { href: "/register", label: "Register" }
-      : { href: "/login", label: "Sign in" };
-
+export function AuthPageLayout({ children }: AuthPageLayoutProps) {
   return (
     <div className="bg-base flex min-h-screen flex-col">
       <main className="bg-primary flex flex-1 flex-col py-16">

@@ -3,14 +3,10 @@
 import { useAuth } from "@/context/auth-context";
 import { ApiError, getValidationErrors } from "@/lib/api-client";
 import type { FieldErrors } from "@/types/auth";
+import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
-
-const inputClass =
-  "mt-1 w-full rounded-lg border border-base bg-base px-3 py-2.5 text-base text-base-color placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]";
-const inputErrorClass =
-  "mt-1 w-full rounded-lg border border-[var(--color-danger)] bg-base px-3 py-2.5 text-base text-base-color placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]";
 
 export function RegisterForm() {
   const { register, isAuthenticated, loading } = useAuth();
@@ -78,14 +74,15 @@ export function RegisterForm() {
           <label htmlFor="register-name" className="block text-sm font-medium text-base-color">
             Full name
           </label>
-          <input
+          <Input
             id="register-name"
             name="name"
             type="text"
             autoComplete="name"
             required
             placeholder="Ada Lovelace"
-            className={fieldErrors.name?.length ? inputErrorClass : inputClass}
+            aria-invalid={fieldErrors.name?.length ? true : undefined}
+            className="mt-1"
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
@@ -100,14 +97,15 @@ export function RegisterForm() {
           <label htmlFor="register-email" className="block text-sm font-medium text-base-color">
             Email
           </label>
-          <input
+          <Input
             id="register-email"
             name="email"
             type="email"
             autoComplete="email"
             required
             placeholder="you@example.com"
-            className={fieldErrors.email?.length ? inputErrorClass : inputClass}
+            aria-invalid={fieldErrors.email?.length ? true : undefined}
+            className="mt-1"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
@@ -122,14 +120,15 @@ export function RegisterForm() {
           <label htmlFor="register-password" className="block text-sm font-medium text-base-color">
             Password
           </label>
-          <input
+          <Input
             id="register-password"
             name="password"
             type="password"
             autoComplete="new-password"
             required
             minLength={8}
-            className={fieldErrors.password?.length ? inputErrorClass : inputClass}
+            aria-invalid={fieldErrors.password?.length ? true : undefined}
+            className="mt-1"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
           />
@@ -148,14 +147,15 @@ export function RegisterForm() {
           >
             Confirm password
           </label>
-          <input
+          <Input
             id="register-password-confirm"
             name="password_confirmation"
             type="password"
             autoComplete="new-password"
             required
             minLength={8}
-            className={fieldErrors.password_confirmation?.length ? inputErrorClass : inputClass}
+            aria-invalid={fieldErrors.password_confirmation?.length ? true : undefined}
+            className="mt-1"
             value={passwordConfirmation}
             onChange={(event) => setPasswordConfirmation(event.target.value)}
           />
