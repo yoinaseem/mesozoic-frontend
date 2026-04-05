@@ -1,9 +1,9 @@
-﻿"use client";
+"use client";
 
 import { useAuth } from "@/context/auth-context";
 import { useRouter } from "next/navigation";
 
-export default function HomePage() {
+export default function DashboardPage() {
   const { user, logout, loading } = useAuth();
   const router = useRouter();
 

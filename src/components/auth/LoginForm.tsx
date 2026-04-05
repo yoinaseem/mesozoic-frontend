@@ -12,13 +12,15 @@ const inputClass =
 const inputErrorClass =
   "mt-1 w-full rounded-lg border border-[var(--color-danger)] bg-base px-3 py-2.5 text-base text-base-color placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]";
 
+const DEFAULT_AFTER_AUTH = "/dashboard";
+
 function resolveNextPath(nextParam: string | null): string {
-  if (!nextParam) {
-    return "/";
+  if (!nextParam || nextParam === "/") {
+    return DEFAULT_AFTER_AUTH;
   }
 
   if (!nextParam.startsWith("/") || nextParam.startsWith("//")) {
-    return "/";
+    return DEFAULT_AFTER_AUTH;
   }
 
   return nextParam;
