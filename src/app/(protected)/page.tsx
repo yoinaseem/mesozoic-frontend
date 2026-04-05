@@ -14,15 +14,6 @@ export default function HomePage() {
 
   return (
     <div className="bg-base min-h-screen">
-      <header className="bg-surface border-b border-base">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-6">
-          <div>
-            <p className="text-xl font-bold text-primary">Mesozoic Isle</p>
-            <p className="text-muted mt-1">Authenticated dashboard</p>
-          </div>
-        </div>
-      </header>
-
       <main className="py-16">
         <div className="max-w-7xl mx-auto px-6">
           <section className="card max-w-3xl">
