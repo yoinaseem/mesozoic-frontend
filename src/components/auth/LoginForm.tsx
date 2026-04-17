@@ -10,11 +10,11 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 
 function resolveNextPath(nextParam: string | null): string {
   if (!nextParam) {
-    return "/";
+    return "/dashboard";
   }
 
   if (!nextParam.startsWith("/") || nextParam.startsWith("//")) {
-    return "/";
+    return "/dashboard";
   }
 
   return nextParam;

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { AuthPageLayout } from "@/components/auth/AuthPageLayout";
 import { LoginForm } from "@/components/auth/LoginForm";
 
@@ -12,7 +13,9 @@ export default function LoginPage() {
     <AuthPageLayout variant="login">
       <div className="card w-full max-w-md">
         <h1 className="text-3xl font-semibold text-primary">Sign in</h1>
-        <LoginForm />
+        <Suspense>
+          <LoginForm />
+        </Suspense>
       </div>
     </AuthPageLayout>
   );

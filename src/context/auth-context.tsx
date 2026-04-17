@@ -26,6 +26,8 @@ type AuthContextValue = {
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
   clearAuth: () => void;
+  hasRole: (role: string) => boolean;
+  hasPermission: (permission: string) => boolean;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -138,12 +140,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const hydrateUser = async () => {
       try {
-        const currentUser = await apiRequest<AuthUser>("/auth/me", {
+        const response = await apiRequest<{ user: AuthUser }>("/auth/me", {
           method: "GET",
           tokenOverride: storedToken,
         });
 
-        setUser(currentUser);
+        setUser(response.user);
       } catch {
         clearAuth();
       } finally {
@@ -153,6 +155,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     void hydrateUser();
   }, [clearAuth]);
+
+  const hasRole = useCallback(
+    (role: string) => user?.roles.includes(role) ?? false,
+    [user]
+  );
+
+  const hasPermission = useCallback(
+    (permission: string) => user?.permissions.includes(permission) ?? false,
+    [user]
+  );
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -164,8 +176,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       register,
       logout,
       clearAuth,
+      hasRole,
+      hasPermission,
     }),
-    [token, user, loading, login, register, logout, clearAuth]
+    [token, user, loading, login, register, logout, clearAuth, hasRole, hasPermission]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
