@@ -1,27 +1,23 @@
 import Image from "next/image";
 
-const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1920&q=80&auto=format&fit=crop";
-
-const heroMinHeight = "min-h-[min(70svh,800px)]";
+const heroMinHeight = "min-h-[calc(100dvh+4rem)]";
 
 export default function HeroBanner() {
   return (
     <section
-      className={`relative w-full overflow-hidden ${heroMinHeight}`}
+      className={`-mt-16 relative w-full overflow-hidden ${heroMinHeight}`}
       aria-label="Welcome"
     >
       <Image
-        src={HERO_IMAGE}
+        src="/img/banner.avif"
         alt=""
         fill
-        className="object-cover"
+        className="z-0 object-cover"
         sizes="100vw"
         priority
       />
-      {/* Softens the photo so token-based text stays readable */}
       <div
-        className="pointer-events-none absolute inset-0 z-[1] bg-base opacity-35"
+        className="pointer-events-none absolute inset-0 z-1 bg-black/50"
         aria-hidden
       />
 
@@ -29,6 +25,11 @@ export default function HeroBanner() {
         className={`relative z-10 flex w-full items-center justify-center px-6 py-24 ${heroMinHeight}`}
       >
         <div className="max-w-7xl w-full text-center">
+          <div
+            id="hero-card-sentinel"
+            className="pointer-events-none h-0 w-full"
+            aria-hidden
+          />
           <div className="card mx-auto max-w-3xl">
             <h1 className="text-5xl font-bold text-primary">
               Welcome to Mesozoic Isle

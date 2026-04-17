@@ -30,11 +30,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${comfortaa.variable} ${cinzel.variable} antialiased`}>
+      <body
+        className={`${comfortaa.variable} ${cinzel.variable} antialiased min-h-dvh flex flex-col`}
+      >
         <AuthProvider>
           <TooltipProvider>
             <Navbar />
-            {children}
+            <main className="flex min-h-0 flex-1 flex-col">{children}</main>
             <Footer />
           </TooltipProvider>
         </AuthProvider>

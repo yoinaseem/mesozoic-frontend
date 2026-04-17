@@ -8,13 +8,15 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
+const DEFAULT_AFTER_AUTH = "/dashboard";
+
 function resolveNextPath(nextParam: string | null): string {
-  if (!nextParam) {
-    return "/dashboard";
+  if (!nextParam || nextParam === "/") {
+    return DEFAULT_AFTER_AUTH;
   }
 
   if (!nextParam.startsWith("/") || nextParam.startsWith("//")) {
-    return "/dashboard";
+    return DEFAULT_AFTER_AUTH;
   }
 
   return nextParam;
