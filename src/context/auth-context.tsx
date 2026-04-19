@@ -28,17 +28,16 @@ function redirectToLogin() {
   }
 
   const path = window.location.pathname;
-  const isAdminArea = path.startsWith("/admin");
-  const loginPath = isAdminArea ? "/admin/login" : "/login";
 
-  const authPages = new Set(["/login", "/register", "/admin/login"]);
-  if (authPages.has(path)) {
+  // Public site routes stay accessible when unauthenticated — a stale token just
+  // gets cleared silently. Only the admin area forces a redirect to /admin/login.
+  if (!path.startsWith("/admin") || path === "/admin/login") {
     return;
   }
 
   const nextPath = `${path}${window.location.search ?? ""}`;
   const safeNextPath = nextPath.startsWith("/") ? nextPath : "/";
-  window.location.assign(`${loginPath}?next=${encodeURIComponent(safeNextPath)}`);
+  window.location.assign(`/admin/login?next=${encodeURIComponent(safeNextPath)}`);
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {

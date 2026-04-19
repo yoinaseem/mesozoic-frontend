@@ -1,8 +1,23 @@
+"use client";
+
 import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "@/context/auth-context";
 
 const heroMinHeight = "min-h-[calc(100dvh+4rem)]";
 
 export default function HeroBanner() {
+  const { isAuthenticated } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const handleBookAdventure = () => {
+    if (!isAuthenticated) {
+      const next = encodeURIComponent(pathname ?? "/");
+      router.push(`/login?next=${next}`);
+    }
+  };
+
   return (
     <section
       className={`-mt-16 relative w-full overflow-hidden ${heroMinHeight}`}
@@ -39,7 +54,11 @@ export default function HeroBanner() {
               Experience prehistoric adventures on our dinosaur-themed island.
             </p>
 
-            <button type="button" className="btn-accent mt-8">
+            <button
+              type="button"
+              className="btn-accent mt-8"
+              onClick={handleBookAdventure}
+            >
               Book Your Adventure
             </button>
           </div>

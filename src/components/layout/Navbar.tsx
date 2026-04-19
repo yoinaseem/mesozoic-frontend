@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 
 const navLinks = [
@@ -16,6 +16,8 @@ const NAVBAR_HEIGHT_PX = 72;
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { isAuthenticated, loading } = useAuth();
   const isHome = pathname === "/";
   const [pastHeroCard, setPastHeroCard] = useState(false);
 
@@ -41,6 +43,13 @@ export default function Navbar() {
   }, [isHome]);
 
   const transparentOnHero = isHome && !pastHeroCard;
+
+  const handleBookNow = () => {
+    if (!isAuthenticated) {
+      const next = encodeURIComponent(pathname ?? "/");
+      router.push(`/login?next=${next}`);
+    }
+  };
 
   return (
     <header
@@ -79,9 +88,20 @@ export default function Navbar() {
           ))}
         </nav>
 
-        <button type="button" className="btn-accent">
-          Book Now
-        </button>
+        {loading ? (
+          <div aria-hidden className="h-10 w-24" />
+        ) : isAuthenticated ? (
+          <button type="button" className="btn-accent" onClick={handleBookNow}>
+            Book Now
+          </button>
+        ) : (
+          <Link
+            href={`/login?next=${encodeURIComponent(pathname ?? "/")}`}
+            className="btn-primary"
+          >
+            Login
+          </Link>
+        )}
       </div>
     </header>
   );
