@@ -17,7 +17,7 @@ const NAVBAR_HEIGHT_PX = 72;
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, logout } = useAuth();
   const isHome = pathname === "/";
   const [pastHeroCard, setPastHeroCard] = useState(false);
 
@@ -49,6 +49,11 @@ export default function Navbar() {
       const next = encodeURIComponent(pathname ?? "/");
       router.push(`/login?next=${next}`);
     }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    router.refresh();
   };
 
   return (
@@ -91,9 +96,22 @@ export default function Navbar() {
         {loading ? (
           <div aria-hidden className="h-10 w-24" />
         ) : isAuthenticated ? (
-          <button type="button" className="btn-accent" onClick={handleBookNow}>
-            Book Now
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className={
+                transparentOnHero
+                  ? "inline-block border-b-2 border-b-transparent pb-0.5 text-base font-semibold text-white! drop-shadow-md transition-[border-bottom-color,opacity] hover:border-b-white hover:opacity-100!"
+                  : "inline-block border-b-2 border-b-transparent pb-0.5 text-base font-semibold text-primary transition-[border-bottom-color,opacity] hover:border-b-current hover:opacity-100!"
+              }
+            >
+              Logout
+            </button>
+            <button type="button" className="btn-accent" onClick={handleBookNow}>
+              Book Now
+            </button>
+          </div>
         ) : (
           <Link
             href={`/login?next=${encodeURIComponent(pathname ?? "/")}`}
