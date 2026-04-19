@@ -2,20 +2,21 @@
 
 import { useAuth } from "@/context/auth-context";
 import { ApiError, getValidationErrors } from "@/lib/api-client";
+import { hasAnyManagementRole } from "@/config/roles";
 import type { FieldErrors } from "@/types/auth";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
-const DEFAULT_AFTER_AUTH = "/dashboard";
+const DEFAULT_AFTER_AUTH = "/";
 
 function resolveNextPath(nextParam: string | null): string {
   if (!nextParam || nextParam === "/") {
     return DEFAULT_AFTER_AUTH;
   }
 
-  if (!nextParam.startsWith("/") || nextParam.startsWith("//")) {
+  if (!nextParam.startsWith("/") || nextParam.startsWith("//") || nextParam.startsWith("/admin")) {
     return DEFAULT_AFTER_AUTH;
   }
 
@@ -23,7 +24,7 @@ function resolveNextPath(nextParam: string | null): string {
 }
 
 export function LoginForm() {
-  const { login, isAuthenticated, loading } = useAuth();
+  const { login, logout, user, isAuthenticated, loading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -36,20 +37,30 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!loading && isAuthenticated) {
+    if (loading || submitting) return;
+    if (isAuthenticated && !hasAnyManagementRole(user?.roles)) {
       router.replace(nextPath);
     }
-  }, [isAuthenticated, loading, nextPath, router]);
+  }, [isAuthenticated, loading, submitting, user, nextPath, router]);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFieldErrors({});
     setFormError("");
+    setSubmitting(true);
 
     try {
-      await login({ email, password });
+      const nextUser = await login({ email, password });
+
+      if (hasAnyManagementRole(nextUser.roles)) {
+        await logout();
+        setFormError("Staff accounts must sign in through the admin portal.");
+        return;
+      }
+
       router.replace(nextPath);
     } catch (error) {
       if (error instanceof ApiError && error.status === 422) {
@@ -72,8 +83,12 @@ export function LoginForm() {
       }
 
       setFormError("Unable to sign in right now. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
   };
+
+  const busy = loading || submitting;
 
   return (
     <>
@@ -139,9 +154,9 @@ export function LoginForm() {
         <button
           type="submit"
           className="btn-primary mt-2 w-full"
-          disabled={loading}
+          disabled={busy}
         >
-          {loading ? "Signing in..." : "Sign in"}
+          {busy ? "Signing in..." : "Sign in"}
         </button>
       </form>
 

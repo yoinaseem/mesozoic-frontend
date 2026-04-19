@@ -17,11 +17,13 @@ import {
 import { TreePalm } from "lucide-react"
 
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
-  const { hasPermission } = useAuth()
+  const { hasPermission, hasRole } = useAuth()
 
-  const visibleItems = adminNavItems.filter(
-    (item) => item.permission === null || hasPermission(item.permission)
-  )
+  const visibleItems = adminNavItems.filter((item) => {
+    const permissionOk = item.permission === null || hasPermission(item.permission)
+    const roleOk = !item.role || hasRole(item.role)
+    return permissionOk && roleOk
+  })
 
   return (
     <Sidebar variant="inset" {...props}>
@@ -29,7 +31,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href="/manage/dashboard">
+              <Link href="/admin/dashboard">
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                   <TreePalm className="size-4" />
                 </div>

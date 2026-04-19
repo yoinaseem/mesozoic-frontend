@@ -4,6 +4,7 @@ import {
   Ship,
   Umbrella,
   TreePalm,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 
@@ -12,6 +13,7 @@ export type AdminNavItem = {
   url: string;
   icon: LucideIcon;
   permission: string | null;
+  role?: string;
   comingSoon?: boolean;
   items?: { title: string; url: string }[];
 };
@@ -19,45 +21,56 @@ export type AdminNavItem = {
 export const adminNavItems: AdminNavItem[] = [
   {
     title: "Dashboard",
-    url: "/manage/dashboard",
+    url: "/admin/dashboard",
     icon: LayoutDashboard,
     permission: null,
   },
   {
     title: "Hotels",
-    url: "/manage/hotels",
+    url: "/admin/hotels",
     icon: Hotel,
     permission: "hotels.view",
     items: [
-      { title: "Hotels", url: "/manage/hotels" },
-      { title: "Room Types", url: "/manage/room-types" },
-      { title: "Rooms", url: "/manage/rooms" },
+      { title: "Hotels", url: "/admin/hotels" },
+      { title: "Room Types", url: "/admin/room-types" },
+      { title: "Rooms", url: "/admin/rooms" },
     ],
   },
   {
     title: "Ferries",
-    url: "/manage/ferries",
+    url: "/admin/ferries",
     icon: Ship,
     permission: "ferry.view",
     items: [
-      { title: "Ferries", url: "/manage/ferries" },
-      { title: "Schedules", url: "/manage/ferry-schedules" },
+      { title: "Ferries", url: "/admin/ferries" },
+      { title: "Schedules", url: "/admin/ferry-schedules" },
     ],
   },
   {
     title: "Beach",
-    url: "/manage/beach-activities",
+    url: "/admin/beach-activities",
     icon: Umbrella,
     permission: "beach.view",
     items: [
-      { title: "Activities", url: "/manage/beach-activities" },
-      { title: "Schedules", url: "/manage/beach-activity-schedules" },
+      { title: "Activities", url: "/admin/beach-activities" },
+      { title: "Schedules", url: "/admin/beach-activity-schedules" },
     ],
   },
   {
     title: "Theme Park",
-    url: "/manage/theme-park",
+    url: "/admin/theme-park",
     icon: TreePalm,
     permission: "park.view",
+  },
+  {
+    title: "Users",
+    url: "/admin/users",
+    icon: Users,
+    permission: null,
+    role: "superadmin",
+    items: [
+      { title: "All users", url: "/admin/users" },
+      { title: "Create user", url: "/admin/users/new" },
+    ],
   },
 ];

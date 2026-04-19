@@ -3,8 +3,6 @@ import { Cinzel, Comfortaa } from "next/font/google";
 import { AuthProvider } from "@/context/auth-context";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
 
 const comfortaa = Comfortaa({
   variable: "--font-comfortaa",
@@ -34,11 +32,7 @@ export default function RootLayout({
         className={`${comfortaa.variable} ${cinzel.variable} antialiased min-h-dvh flex flex-col`}
       >
         <AuthProvider>
-          <TooltipProvider>
-            <Navbar />
-            <main className="flex min-h-0 flex-1 flex-col">{children}</main>
-            <Footer />
-          </TooltipProvider>
+          <TooltipProvider>{children}</TooltipProvider>
         </AuthProvider>
       </body>
     </html>

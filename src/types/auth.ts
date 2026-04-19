@@ -1,8 +1,7 @@
-﻿export type AuthUser = {
+export type AuthUser = {
   id: number;
   name: string;
   email: string;
-  email_verified_at: string | null;
   roles: string[];
   permissions: string[];
   created_at: string;
@@ -15,3 +14,22 @@ export type AuthResponse = {
 };
 
 export type FieldErrors = Record<string, string[]>;
+
+export type Paginated<T> = {
+  data: T[];
+  links: {
+    first: string | null;
+    last: string | null;
+    prev: string | null;
+    next: string | null;
+  };
+  meta: {
+    current_page: number;
+    from: number | null;
+    last_page: number;
+    path: string;
+    per_page: number;
+    to: number | null;
+    total: number;
+  };
+};

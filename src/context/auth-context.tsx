@@ -1,29 +1,19 @@
 "use client";
 
-import { apiRequest, configureApiClient } from "@/lib/api-client";
+import { configureApiClient } from "@/lib/api-client";
+import * as authApi from "@/lib/api/auth";
+import type { LoginPayload, RegisterPayload } from "@/lib/api/auth";
 import { clearStoredToken, readStoredToken, writeStoredToken } from "@/lib/auth-storage";
-import { AuthResponse, AuthUser } from "@/types/auth";
+import { AuthUser } from "@/types/auth";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-
-type LoginPayload = {
-  email: string;
-  password: string;
-};
-
-type RegisterPayload = {
-  name: string;
-  email: string;
-  password: string;
-  password_confirmation: string;
-};
 
 type AuthContextValue = {
   token: string | null;
   user: AuthUser | null;
   isAuthenticated: boolean;
   loading: boolean;
-  login: (payload: LoginPayload) => Promise<void>;
-  register: (payload: RegisterPayload) => Promise<void>;
+  login: (payload: LoginPayload) => Promise<AuthUser>;
+  register: (payload: RegisterPayload) => Promise<AuthUser>;
   logout: () => Promise<void>;
   clearAuth: () => void;
   hasRole: (role: string) => boolean;
@@ -37,12 +27,18 @@ function redirectToLogin() {
     return;
   }
 
-  const isOnAuthPage = window.location.pathname === "/login" || window.location.pathname === "/register";
-  if (!isOnAuthPage) {
-    const nextPath = `${window.location.pathname}${window.location.search ?? ""}`;
-    const safeNextPath = nextPath.startsWith("/") ? nextPath : "/";
-    window.location.assign(`/login?next=${encodeURIComponent(safeNextPath)}`);
+  const path = window.location.pathname;
+  const isAdminArea = path.startsWith("/admin");
+  const loginPath = isAdminArea ? "/admin/login" : "/login";
+
+  const authPages = new Set(["/login", "/register", "/admin/login"]);
+  if (authPages.has(path)) {
+    return;
   }
+
+  const nextPath = `${path}${window.location.search ?? ""}`;
+  const safeNextPath = nextPath.startsWith("/") ? nextPath : "/";
+  window.location.assign(`${loginPath}?next=${encodeURIComponent(safeNextPath)}`);
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -69,13 +65,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (payload: LoginPayload) => {
       setLoading(true);
       try {
-        const response = await apiRequest<AuthResponse>("/auth/login", {
-          method: "POST",
-          body: payload,
-          skipAuth: true,
-        });
-
+        const response = await authApi.login(payload);
         applySession(response.token, response.user);
+        return response.user;
       } finally {
         setLoading(false);
       }
@@ -87,13 +79,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (payload: RegisterPayload) => {
       setLoading(true);
       try {
-        const response = await apiRequest<AuthResponse>("/auth/register", {
-          method: "POST",
-          body: payload,
-          skipAuth: true,
-        });
-
+        const response = await authApi.register(payload);
         applySession(response.token, response.user);
+        return response.user;
       } finally {
         setLoading(false);
       }
@@ -105,9 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       if (tokenRef.current) {
-        await apiRequest<{ message: string }>("/auth/logout", {
-          method: "POST",
-        });
+        await authApi.logout();
       }
     } catch {
       // Local auth state must still be cleared even when the API call fails.
@@ -140,12 +126,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const hydrateUser = async () => {
       try {
-        const response = await apiRequest<{ user: AuthUser }>("/auth/me", {
-          method: "GET",
-          tokenOverride: storedToken,
-        });
-
-        setUser(response.user);
+        const nextUser = await authApi.me(storedToken);
+        setUser(nextUser);
       } catch {
         clearAuth();
       } finally {
