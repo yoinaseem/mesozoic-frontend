@@ -30,14 +30,12 @@ function redirectToLogin() {
   const path = window.location.pathname;
 
   // Public site routes stay accessible when unauthenticated — a stale token just
-  // gets cleared silently. Only the admin area forces a redirect to /admin/login.
-  if (!path.startsWith("/admin") || path === "/admin/login") {
+  // gets cleared silently. Only protected areas force a redirect to /login.
+  if (!path.startsWith("/admin") || path === "/login") {
     return;
   }
 
-  const nextPath = `${path}${window.location.search ?? ""}`;
-  const safeNextPath = nextPath.startsWith("/") ? nextPath : "/";
-  window.location.assign(`/admin/login?next=${encodeURIComponent(safeNextPath)}`);
+  window.location.assign("/login");
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/context/auth-context";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 type ProtectedRouteProps = {
@@ -15,10 +15,9 @@ export function ProtectedRoute({
   children,
   allowedRoles,
   loginPath = "/login",
-  unauthorizedPath = "/",
+  unauthorizedPath = "/dashboard",
 }: ProtectedRouteProps) {
   const { user, isAuthenticated, loading } = useAuth();
-  const pathname = usePathname();
   const router = useRouter();
 
   const hasRequiredRole =
@@ -28,17 +27,14 @@ export function ProtectedRoute({
     if (loading) return;
 
     if (!isAuthenticated) {
-      const redirectTarget = pathname
-        ? `${loginPath}?next=${encodeURIComponent(pathname)}`
-        : loginPath;
-      router.replace(redirectTarget);
+      router.replace(loginPath);
       return;
     }
 
     if (!hasRequiredRole) {
       router.replace(unauthorizedPath);
     }
-  }, [isAuthenticated, loading, hasRequiredRole, pathname, router, loginPath, unauthorizedPath]);
+  }, [isAuthenticated, loading, hasRequiredRole, router, loginPath, unauthorizedPath]);
 
   if (loading) {
     return (

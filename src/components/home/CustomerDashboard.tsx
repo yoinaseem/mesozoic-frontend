@@ -1,7 +1,6 @@
 "use client";
 
 import { useAuth } from "@/context/auth-context";
-import { hasAnyManagementRole } from "@/config/roles";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,7 +16,6 @@ export function CustomerDashboard() {
   const router = useRouter();
 
   if (loading || !isAuthenticated || !user) return null;
-  if (hasAnyManagementRole(user.roles)) return null;
 
   const handleLogout = async () => {
     await logout();

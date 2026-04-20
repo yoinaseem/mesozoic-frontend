@@ -46,9 +46,7 @@ export default function Navbar() {
 
   const handleBookNow = () => {
     if (!isAuthenticated) {
-      const next = encodeURIComponent(pathname ?? "/");
-      router.push(`/login?next=${next}`);
-      return;
+      router.push("/login");
     }
     router.push("/book");
   };
@@ -116,7 +114,7 @@ export default function Navbar() {
           </div>
         ) : (
           <Link
-            href={`/login?next=${encodeURIComponent(pathname ?? "/")}`}
+            href="/login"
             className="btn-primary"
           >
             Login
