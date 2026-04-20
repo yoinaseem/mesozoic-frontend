@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 
 const navLinks = [
-  { href: "#attractions", label: "Attractions" },
+  { href: "/activities", label: "The Kingdom" }, // Updated per DESD-43
   { href: "#activities", label: "Activities" },
   { href: "#accommodation", label: "Accommodation" },
 ];
@@ -47,6 +47,8 @@ export default function Navbar() {
   const handleBookNow = () => {
     if (!isAuthenticated) {
       router.push("/login");
+    } else {
+      router.push("/booking"); // Redirecting to booking page per instructions
     }
   };
 
@@ -78,7 +80,7 @@ export default function Navbar() {
 
         <nav className="flex flex-wrap items-center gap-6" aria-label="Primary">
           {navLinks.map(({ href, label }) => (
-            <a
+            <Link
               key={href}
               href={href}
               className={
@@ -88,7 +90,7 @@ export default function Navbar() {
               }
             >
               {label}
-            </a>
+            </Link>
           ))}
         </nav>
 
@@ -107,17 +109,20 @@ export default function Navbar() {
             >
               Logout
             </button>
+            {/* UI Component Rule #5: btn-accent for Book Now */}
             <button type="button" className="btn-accent" onClick={handleBookNow}>
               Book Now
             </button>
           </div>
         ) : (
-          <Link
-            href="/login"
-            className="btn-primary"
-          >
-            Login
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/login" className="btn-primary">
+              Login
+            </Link>
+            <button type="button" className="btn-accent" onClick={handleBookNow}>
+              Book Now
+            </button>
+          </div>
         )}
       </div>
     </header>
