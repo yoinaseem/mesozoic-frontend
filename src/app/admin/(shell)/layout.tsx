@@ -8,8 +8,8 @@ export default function AdminShellLayout({ children }: { children: React.ReactNo
   return (
     <ProtectedRoute
       allowedRoles={[...MANAGEMENT_ROLES]}
-      loginPath="/admin/login"
-      unauthorizedPath="/admin/login"
+      loginPath="/login"
+      unauthorizedPath="/dashboard"
     >
       <SidebarProvider>
         <AppSidebar />

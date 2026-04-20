@@ -21,7 +21,7 @@ export function RegisterForm() {
 
   useEffect(() => {
     if (!loading && isAuthenticated) {
-      router.replace("/");
+      router.replace("/dashboard");
     }
   }, [isAuthenticated, loading, router]);
 
@@ -45,7 +45,7 @@ export function RegisterForm() {
         password_confirmation: passwordConfirmation,
       });
 
-      router.replace("/");
+      router.replace("/dashboard");
     } catch (error) {
       if (error instanceof ApiError && error.status === 422) {
         const validationErrors = getValidationErrors(error);
