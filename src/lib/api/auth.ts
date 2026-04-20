@@ -36,8 +36,9 @@ export async function logout() {
 }
 
 export async function me(token?: string) {
-  return apiRequest<AuthUser>("/auth/me", {
+  const response = await apiRequest<{ user: AuthUser }>("/auth/me", {
     method: "GET",
     tokenOverride: token,
   });
+  return response.user;
 }
