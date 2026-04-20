@@ -18,7 +18,7 @@ import {
 
 const navLinks = [
   { href: "/activities", label: "The Kingdom" },
-  { href: "#activities", label: "Activities" },
+  { href: "/beach-activities", label: "Island Experiences" },
   { href: "/accommodation", label: "Accommodation" },
 ] as const;
 
@@ -63,16 +63,6 @@ export default function Navbar() {
   }, [isHome]);
 
   const transparentOnHero = isHome && !pastHeroCard;
-
-  // temporarily commented, to move to different component/page
-  // const handleBookNow = () => {
-  //   if (!isAuthenticated) {
-  //     router.push("/login");
-  //   } else {
-  //     router.push("/booking"); // Redirecting to booking page per instructions
-  //   }
-  //   router.push("/book");
-  // };
 
   const handleLogout = async () => {
     await logout();
