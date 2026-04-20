@@ -169,6 +169,15 @@
   a:hover {
     opacity: 0.85;
   }
+
+  [data-sidebar] a {
+    color: inherit;
+    opacity: 0.85;
+  }
+
+  [data-sidebar] a:hover {
+    opacity: 1;
+  }
   * {
     @apply border-border outline-ring/50;
   }
