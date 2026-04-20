@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
+import { ModeToggle } from "@/components/mode-toggle";
 
 const navLinks = [
   { href: "/activities", label: "The Kingdom" }, // Updated per DESD-43
@@ -94,36 +95,39 @@ export default function Navbar() {
           ))}
         </nav>
 
-        {loading ? (
-          <div aria-hidden className="h-10 w-24" />
-        ) : isAuthenticated ? (
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={handleLogout}
-              className={
-                transparentOnHero
-                  ? "inline-block border-b-2 border-b-transparent pb-0.5 text-base font-semibold text-white! drop-shadow-md transition-[border-bottom-color,opacity] hover:border-b-white hover:opacity-100!"
-                  : "inline-block border-b-2 border-b-transparent pb-0.5 text-base font-semibold text-primary transition-[border-bottom-color,opacity] hover:border-b-current hover:opacity-100!"
-              }
-            >
-              Logout
-            </button>
-            {/* UI Component Rule #5: btn-accent for Book Now */}
-            <button type="button" className="btn-accent" onClick={handleBookNow}>
-              Book Now
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-4">
-            <Link href="/login" className="btn-primary">
-              Login
-            </Link>
-            <button type="button" className="btn-accent" onClick={handleBookNow}>
-              Book Now
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-4">
+          <ModeToggle className={transparentOnHero ? "text-white! drop-shadow-md" : ""} />
+
+          {loading ? (
+            <div aria-hidden className="h-10 w-24" />
+          ) : isAuthenticated ? (
+            <>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className={
+                  transparentOnHero
+                    ? "inline-block border-b-2 border-b-transparent pb-0.5 text-base font-semibold text-white! drop-shadow-md transition-[border-bottom-color,opacity] hover:border-b-white hover:opacity-100!"
+                    : "inline-block border-b-2 border-b-transparent pb-0.5 text-base font-semibold text-primary transition-[border-bottom-color,opacity] hover:border-b-current hover:opacity-100!"
+                }
+              >
+                Logout
+              </button>
+              <button type="button" className="btn-accent" onClick={handleBookNow}>
+                Book Now
+              </button>
+            </>
+          ) : (
+            <>
+              <Link href="/login" className="btn-primary">
+                Login
+              </Link>
+              <button type="button" className="btn-accent" onClick={handleBookNow}>
+                Book Now
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </header>
   );
