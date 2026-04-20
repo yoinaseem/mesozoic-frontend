@@ -22,7 +22,7 @@ export function ProtectedRoute({
   const router = useRouter();
 
   const hasRequiredRole =
-    !allowedRoles || (user?.roles.some((role) => allowedRoles.includes(role)) ?? false);
+    !allowedRoles || (user?.roles?.some((role) => allowedRoles.includes(role)) ?? false);
 
   useEffect(() => {
     if (loading) return;

@@ -48,7 +48,9 @@ export default function Navbar() {
     if (!isAuthenticated) {
       const next = encodeURIComponent(pathname ?? "/");
       router.push(`/login?next=${next}`);
+      return;
     }
+    router.push("/book");
   };
 
   const handleLogout = async () => {

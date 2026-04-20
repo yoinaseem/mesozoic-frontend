@@ -15,7 +15,9 @@ export default function HeroBanner() {
     if (!isAuthenticated) {
       const next = encodeURIComponent(pathname ?? "/");
       router.push(`/login?next=${next}`);
+      return;
     }
+    router.push("/book");
   };
 
   return (
