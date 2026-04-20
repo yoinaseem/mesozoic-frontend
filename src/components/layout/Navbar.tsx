@@ -8,8 +8,8 @@ import { useAuth } from "@/context/auth-context";
 const navLinks = [
   { href: "#attractions", label: "Attractions" },
   { href: "#activities", label: "Activities" },
-  { href: "#accommodation", label: "Accommodation" },
-];
+  { href: "/rooms", label: "Rooms" },
+] as const;
 
 /** Approximate fixed bar height (py-4 + text line); used with hero-card-sentinel rect */
 const NAVBAR_HEIGHT_PX = 72;
@@ -78,19 +78,21 @@ export default function Navbar() {
         </Link>
 
         <nav className="flex flex-wrap items-center gap-6" aria-label="Primary">
-          {navLinks.map(({ href, label }) => (
-            <a
-              key={href}
-              href={href}
-              className={
-                transparentOnHero
-                  ? "inline-block border-b-2 border-b-transparent pb-0.5 text-base font-semibold text-white! drop-shadow-md transition-[border-bottom-color,opacity] hover:border-b-white hover:opacity-100!"
-                  : "inline-block border-b-2 border-b-transparent pb-0.5 text-base font-semibold text-primary transition-[border-bottom-color,opacity] hover:border-b-current hover:opacity-100!"
-              }
-            >
-              {label}
-            </a>
-          ))}
+          {navLinks.map(({ href, label }) => {
+            const className =
+              transparentOnHero
+                ? "inline-block border-b-2 border-b-transparent pb-0.5 text-base font-semibold text-white! drop-shadow-md transition-[border-bottom-color,opacity] hover:border-b-white hover:opacity-100!"
+                : "inline-block border-b-2 border-b-transparent pb-0.5 text-base font-semibold text-primary transition-[border-bottom-color,opacity] hover:border-b-current hover:opacity-100!";
+            return href.startsWith("/") ? (
+              <Link key={href} href={href} className={className}>
+                {label}
+              </Link>
+            ) : (
+              <a key={href} href={href} className={className}>
+                {label}
+              </a>
+            );
+          })}
         </nav>
 
         {loading ? (

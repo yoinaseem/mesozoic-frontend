@@ -1,7 +1,9 @@
+import Link from "next/link";
+
 const quickLinks = [
   { href: "#", label: "Attractions" },
   { href: "#", label: "Activities" },
-  { href: "#", label: "Accommodation" },
+  { href: "/rooms", label: "Rooms" },
   { href: "#", label: "Packages" },
 ];
 
@@ -83,9 +85,15 @@ export default function Footer() {
               <ul className="flex flex-col gap-3">
                 {quickLinks.map(({ href, label }) => (
                   <li key={label}>
-                    <a href={href} className="text-sm text-base-color">
-                      {label}
-                    </a>
+                    {href.startsWith("/") ? (
+                      <Link href={href} className="text-sm text-base-color">
+                        {label}
+                      </Link>
+                    ) : (
+                      <a href={href} className="text-sm text-base-color">
+                        {label}
+                      </a>
+                    )}
                   </li>
                 ))}
               </ul>
