@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 
 const heroMinHeight = "min-h-[calc(100dvh+4rem)]";
@@ -9,12 +9,10 @@ const heroMinHeight = "min-h-[calc(100dvh+4rem)]";
 export default function HeroBanner() {
   const { isAuthenticated } = useAuth();
   const router = useRouter();
-  const pathname = usePathname();
 
   const handleBookAdventure = () => {
     if (!isAuthenticated) {
-      const next = encodeURIComponent(pathname ?? "/");
-      router.push(`/login?next=${next}`);
+      router.push("/login");
     }
   };
 

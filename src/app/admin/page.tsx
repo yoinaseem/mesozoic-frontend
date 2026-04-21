@@ -12,10 +12,12 @@ export default function AdminLandingPage() {
   useEffect(() => {
     if (loading) return;
 
-    if (isAuthenticated && hasAnyManagementRole(user?.roles)) {
+    if (!isAuthenticated) {
+      router.replace("/login");
+    } else if (hasAnyManagementRole(user?.roles)) {
       router.replace("/admin/dashboard");
     } else {
-      router.replace("/admin/login");
+      router.replace("/dashboard");
     }
   }, [isAuthenticated, loading, user, router]);
 

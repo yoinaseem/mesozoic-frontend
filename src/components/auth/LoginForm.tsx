@@ -6,32 +6,16 @@ import { hasAnyManagementRole } from "@/config/roles";
 import type { FieldErrors } from "@/types/auth";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { FormEvent, useEffect, useState } from "react";
 
-const DEFAULT_AFTER_AUTH = "/";
-
-function resolveNextPath(nextParam: string | null): string {
-  if (!nextParam || nextParam === "/") {
-    return DEFAULT_AFTER_AUTH;
-  }
-
-  if (!nextParam.startsWith("/") || nextParam.startsWith("//") || nextParam.startsWith("/admin")) {
-    return DEFAULT_AFTER_AUTH;
-  }
-
-  return nextParam;
+function redirectForRole(roles: string[] | undefined): string {
+  return hasAnyManagementRole(roles) ? "/admin/dashboard" : "/dashboard";
 }
 
 export function LoginForm() {
-  const { login, logout, user, isAuthenticated, loading } = useAuth();
+  const { login, user, isAuthenticated, loading } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
-
-  const nextPath = useMemo(
-    () => resolveNextPath(searchParams.get("next")),
-    [searchParams],
-  );
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,10 +25,10 @@ export function LoginForm() {
 
   useEffect(() => {
     if (loading || submitting) return;
-    if (isAuthenticated && !hasAnyManagementRole(user?.roles)) {
-      router.replace(nextPath);
+    if (isAuthenticated) {
+      router.replace(redirectForRole(user?.roles));
     }
-  }, [isAuthenticated, loading, submitting, user, nextPath, router]);
+  }, [isAuthenticated, loading, submitting, user, router]);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -54,14 +38,7 @@ export function LoginForm() {
 
     try {
       const nextUser = await login({ email, password });
-
-      if (hasAnyManagementRole(nextUser.roles)) {
-        await logout();
-        setFormError("Staff accounts must sign in through the admin portal.");
-        return;
-      }
-
-      router.replace(nextPath);
+      router.replace(redirectForRole(nextUser.roles));
     } catch (error) {
       if (error instanceof ApiError && error.status === 422) {
         const validationErrors = getValidationErrors(error);
