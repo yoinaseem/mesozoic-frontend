@@ -9,7 +9,7 @@ import { ModeToggle } from "@/components/mode-toggle";
 const navLinks = [
   { href: "/activities", label: "The Kingdom" }, // Updated per DESD-43
   { href: "#activities", label: "Activities" },
-  { href: "/rooms", label: "Rooms" },
+  { href: "/accommodation", label: "Accommodation" },
 ] as const;
 
 /** Approximate fixed bar height (py-4 + text line); used with hero-card-sentinel rect */
@@ -80,7 +80,6 @@ export default function Navbar() {
         </Link>
 
         <nav className="flex flex-wrap items-center gap-6" aria-label="Primary">
-<<<<<<< HEAD
           {navLinks.map(({ href, label }) => {
             const className =
               transparentOnHero
@@ -96,21 +95,6 @@ export default function Navbar() {
               </a>
             );
           })}
-=======
-          {navLinks.map(({ href, label }) => (
-            <Link
-              key={href}
-              href={href}
-              className={
-                transparentOnHero
-                  ? "inline-block border-b-2 border-b-transparent pb-0.5 text-base font-semibold text-white! drop-shadow-md transition-[border-bottom-color,opacity] hover:border-b-white hover:opacity-100!"
-                  : "inline-block border-b-2 border-b-transparent pb-0.5 text-base font-semibold text-primary transition-[border-bottom-color,opacity] hover:border-b-current hover:opacity-100!"
-              }
-            >
-              {label}
-            </Link>
-          ))}
->>>>>>> bf467d2d5a7f44139040dedfd1feef2f090914aa
         </nav>
 
         <div className="flex items-center gap-4">

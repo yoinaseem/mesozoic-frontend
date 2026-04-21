@@ -1,57 +1,67 @@
-export type RoomCardItem = {
+export type RoomType = {
+  id: number;
+  hotelId: number;
   name: string;
-  description: string;
-  /** Optional query string for booking, e.g. `type=jungle-suite` */
-  bookingQuery?: string;
+  description: string | null;
+  image: string | null;
+  capacity: number;
+  price: number;
+  amenities: string[];
 };
 
-export const roomTypes: RoomCardItem[] = [
+export const roomTypes: RoomType[] = [
   {
-    name: "Standard Lodge",
-    description: "Cozy lodge rooms with jungle views, queen bed, and rain shower.",
-    bookingQuery: "type=standard-lodge",
+    id: 1,
+    hotelId: 1,
+    name: "Standard Jungle Room",
+    description: "Comfortable base camp room with nature-facing windows.",
+    image: "/img/banner.avif",
+    capacity: 2,
+    price: 179.0,
+    amenities: ["Queen bed", "Rain shower", "Wi-Fi", "Breakfast"],
   },
   {
-    name: "Premium Jungle Suite",
-    description: "Extra space, private balcony, and upgraded island amenities.",
-    bookingQuery: "type=premium-jungle-suite",
+    id: 2,
+    hotelId: 1,
+    name: "Family Fossil Suite",
+    description: "Large family suite with separate sleeping zone and lounge.",
+    image: "/img/banner.avif",
+    capacity: 4,
+    price: 289.0,
+    amenities: ["2 queen beds", "Mini fridge", "Balcony", "Breakfast"],
   },
   {
-    name: "Family Bunk Retreat",
-    description: "Bunk beds plus a sofa bed—built for families and small groups.",
-    bookingQuery: "type=family-bunk",
+    id: 3,
+    hotelId: 2,
+    name: "Raptor Ridge Deluxe",
+    description: "Premium mountain-side room with panoramic lagoon views.",
+    image: "/img/banner.avif",
+    capacity: 3,
+    price: 329.0,
+    amenities: ["King bed", "Private deck", "Smart TV", "Shuttle pass"],
   },
   {
-    name: "Cliffside Vista",
-    description: "Panoramic lagoon views from the highest ridge on the property.",
-    bookingQuery: "type=cliffside-vista",
+    id: 4,
+    hotelId: 2,
+    name: "Explorer Twin Lodge",
+    description: "Twin setup for friends and adventure groups.",
+    image: "/img/banner.avif",
+    capacity: 2,
+    price: 199.0,
+    amenities: ["Twin beds", "Work desk", "Wi-Fi", "Breakfast"],
+  },
+  {
+    id: 5,
+    hotelId: 3,
+    name: "Lagoon Signature Villa",
+    description: "High-end villa near the water trail and safari pickup point.",
+    image: "/img/banner.avif",
+    capacity: 5,
+    price: 459.0,
+    amenities: ["2 bedrooms", "Kitchenette", "Private terrace", "Concierge"],
   },
 ];
 
-export const availableRooms: RoomCardItem[] = [
-  {
-    name: "Room 204 — Lagoon Wing",
-    description: "Two queens, walk-in shower, steps from the lagoon boardwalk.",
-    bookingQuery: "room=204",
-  },
-  {
-    name: "Room 312 — Canopy Level",
-    description: "King bed, treetop outlook, quiet end of the main lodge.",
-    bookingQuery: "room=312",
-  },
-  {
-    name: "Suite 401 — Raptor Ridge",
-    description: "Separate living area, kitchenette, and private sunrise deck.",
-    bookingQuery: "room=401",
-  },
-  {
-    name: "Room 118 — Garden Ground",
-    description: "Accessible route, twin beds, patio opening to fern gardens.",
-    bookingQuery: "room=118",
-  },
-  {
-    name: "Room 225 — Fossil Court",
-    description: "Themed fossil accents, queen bed, near the dig-site shuttle stop.",
-    bookingQuery: "room=225",
-  },
-];
+export function getRoomTypeById(id: number) {
+  return roomTypes.find((roomType) => roomType.id === id) ?? null;
+}
