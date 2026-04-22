@@ -19,8 +19,8 @@ import {
 const navLinks = [
   { href: "/activities", label: "The Kingdom" },
   { href: "#activities", label: "Activities" },
-  { href: "#accommodation", label: "Accommodation" },
-];
+  { href: "/accommodation", label: "Accommodation" },
+] as const;
 
 /** Approximate fixed bar height (py-4 + text line); used with hero-card-sentinel rect */
 const NAVBAR_HEIGHT_PX = 72;
