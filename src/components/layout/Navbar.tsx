@@ -64,6 +64,16 @@ export default function Navbar() {
 
   const transparentOnHero = isHome && !pastHeroCard;
 
+  // temporarily commented, to move to different component/page
+  // const handleBookNow = () => {
+  //   if (!isAuthenticated) {
+  //     router.push("/login");
+  //   } else {
+  //     router.push("/booking"); // Redirecting to booking page per instructions
+  //   }
+  //   router.push("/book");
+  // };
+
   const handleLogout = async () => {
     await logout();
     router.refresh();
