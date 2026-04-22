@@ -51,6 +51,7 @@ export default function Navbar() {
     } else {
       router.push("/booking"); // Redirecting to booking page per instructions
     }
+    router.push("/book");
   };
 
   const handleLogout = async () => {

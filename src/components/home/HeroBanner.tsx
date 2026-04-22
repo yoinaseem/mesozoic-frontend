@@ -14,6 +14,7 @@ export default function HeroBanner() {
     if (!isAuthenticated) {
       router.push("/login");
     }
+    router.push("/book");
   };
 
   return (
