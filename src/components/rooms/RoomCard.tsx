@@ -1,6 +1,16 @@
 import Link from "next/link";
 import Image from "next/image";
-import type { RoomType } from "@/components/rooms/rooms-data";
+
+export type RoomType = {
+  id: number;
+  hotelId: number;
+  name: string;
+  description: string | null;
+  image: string | null;
+  capacity: number;
+  price: number;
+  amenities: string[];
+};
 
 type RoomCardProps = {
   roomType: RoomType;
