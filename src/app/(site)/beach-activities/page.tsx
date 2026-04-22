@@ -1,78 +1,115 @@
-import React from 'react';
-import Link from 'next/link';
+'use client';
 
-const beachActivities = [
-  {
-    id: 1,
-    title: "Lagoon Kayaking",
-    description: "Paddle through crystal-clear prehistoric lagoons surrounded by lush jungle canopy and ancient rock formations.",
-    imageUrl: "https://images.unsplash.com/photo-1506953823976-52e1fdc0149a?q=80&w=1000"
-  },
-  {
-    id: 2,
-    title: "Coral Reef Snorkeling",
-    description: "Dive beneath the surface and discover a vibrant underwater world teeming with exotic marine life.",
-    imageUrl: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=1000"
-  },
-  {
-    id: 3,
-    title: "Sunset Sailing",
-    description: "Set sail along the island coast as the sun dips below the horizon in a blaze of amber and gold.",
-    imageUrl: "https://images.unsplash.com/photo-1500514966906-fe245eea9344?q=80&w=1000"
-  },
-  {
-    id: 4,
-    title: "Jungle Beach Hike",
-    description: "Trek through dense prehistoric jungle trails that open onto secluded white-sand beaches.",
-    imageUrl: "https://images.unsplash.com/photo-1501555088652-021faa106b9b?q=80&w=1000"
-  },
-  {
-    id: 5,
-    title: "Pterosaur Coastal Watch",
-    description: "Join our rangers on the shoreline cliffs for an up-close encounter with coastal pterosaurs at dusk.",
-    imageUrl: "https://images.unsplash.com/photo-1606856094755-71f7832832bc?q=80&w=1000"
-  },
-  {
-    id: 6,
-    title: "Deep Sea Fishing",
-    description: "Venture into open waters on a guided deep-sea expedition and reel in the catch of a lifetime.",
-    imageUrl: "https://images.unsplash.com/photo-1559628376-f3fe5f782a2e?q=80&w=1000"
-  }
-];
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { BeachActivityCard } from '@/components/beach-activities/BeachActivityCard';
+import { getBeachActivities, type BeachActivity } from '@/lib/api/beach-activities';
 
 export default function BeachActivitiesPage() {
-  return (
-    <div className="bg-base min-h-screen">
-      <section className="py-24">
-        <div className="max-w-7xl mx-auto px-6">
+  const [activities, setActivities] = useState<BeachActivity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<BeachActivity | null>(null);
 
-          <header className="mb-12">
-            <h1 className="text-5xl font-bold text-primary">Beach Activities</h1>
-            <p className="text-muted mt-4 text-lg max-w-2xl">
-              From coastal kayaking to jungle treks, discover the island's most
-              thrilling waterfront experiences.
+  const handleSelect = (activity: BeachActivity) => {
+    setSelectedActivity(prev => prev?.id === activity.id ? null : activity);
+  };
+
+  useEffect(() => {
+    const fetchActivities = async () => {
+      try {
+        setLoading(true);
+        const data = await getBeachActivities();
+        setActivities(data);
+      } catch (err) {
+        setError('Failed to load beach activities');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchActivities();
+  }, []);
+
+  return (
+    <div className="bg-base min-h-screen pt-[72px]">
+      {/* Hero Section */}
+      <section className="pt-16 pb-4 bg-gradient-to-b from-primary/10 to-transparent">
+        <div className="max-w-7xl mx-auto px-6">
+          <header className="mb-8">
+            <h1 className="text-5xl font-bold text-primary mb-4">
+              Island Beach Adventures
+            </h1>
+            <p className="text-muted text-lg">
+              Experience the thrill of the ocean with our carefully curated selection of beach activities. 
+              From adrenaline-pumping water sports to serene coastal explorations, discover unforgettable 
+              moments on the island's pristine beaches. Each activity is guided by experienced professionals 
+              to ensure your safety and maximum enjoyment.
             </p>
           </header>
+        </div>
+      </section>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-8">
-            {beachActivities.map((activity) => (
-              <div key={activity.id} className="card h-full flex flex-col">
-                <img
-                  src={activity.imageUrl}
-                  alt={activity.title}
-                  className="rounded-lg w-full h-64 object-cover"
-                />
-                <div className="flex flex-col flex-grow mt-4">
-                  <h3 className="text-xl font-bold text-primary">{activity.title}</h3>
-                  <p className="text-muted mt-2 flex-grow">{activity.description}</p>
-                  <Link href="/booking" className="mt-4">
-                    <button className="btn-accent w-full">Book Now</button>
-                  </Link>
-                </div>
+      {/* Activities Section */}
+      <section className="pt-4 pb-16">
+        <div className="max-w-7xl mx-auto px-6">
+          {loading ? (
+            <div className="flex justify-center items-center min-h-96">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted">Loading activities...</p>
               </div>
-            ))}
-          </div>
+            </div>
+          ) : error ? (
+            <div className="flex justify-center items-center min-h-96">
+              <div className="text-center">
+                <p className="text-red-500">{error}</p>
+              </div>
+            </div>
+          ) : activities.length === 0 ? (
+            <div className="flex justify-center items-center min-h-96">
+              <div className="text-center">
+                <p className="text-muted">No beach activities available at the moment.</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {activities.map((activity) => (
+                  <BeachActivityCard
+                    key={activity.id}
+                    activity={activity}
+                    selected={selectedActivity?.id === activity.id}
+                    onSelect={handleSelect}
+                  />
+                ))}
+              </div>
 
+              {/* CTA Section */}
+              <div className="mt-16 text-center">
+                <h2 className="text-2xl font-bold text-primary mb-4">
+                  Ready for an adventure?
+                </h2>
+                <p className="text-muted mb-8 max-w-xl mx-auto">
+                  {selectedActivity
+                    ? `You selected: ${selectedActivity.name}`
+                    : 'Select an activity above, then click below to book.'}
+                </p>
+                {selectedActivity ? (
+                  <Link href={`/booking?activity=beach-${selectedActivity.id}`}>
+                    <button className="btn-accent px-8 py-3 text-lg">
+                      Book Your Activity
+                    </button>
+                  </Link>
+                ) : (
+                  <button disabled className="btn-accent px-8 py-3 text-lg opacity-40 cursor-not-allowed">
+                    Book Your Activity
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </section>
     </div>
