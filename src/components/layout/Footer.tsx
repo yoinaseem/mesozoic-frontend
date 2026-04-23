@@ -2,9 +2,11 @@ import Link from "next/link";
 
 const quickLinks = [
   { href: "#", label: "Attractions" },
+  { href: "/about", label: "About Us" },
   { href: "#", label: "Activities" },
   { href: "/accommodation", label: "Accommodation" },
   { href: "#", label: "Packages" },
+  { href: "/beach-activities", label: "Island Experiences" },
 ];
 
 const socialLinks = [
