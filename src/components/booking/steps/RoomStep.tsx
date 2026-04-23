@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { useBookingCart } from "@/context/booking-cart-context";
 import { getHotel, listHotels, listRooms } from "@/lib/api/hotels";
@@ -27,14 +28,18 @@ export function RoomStep() {
     cart.room?.hotel.id ?? null,
   );
   const [hotelDetail, setHotelDetail] = useState<Hotel | null>(null);
-  const [loadingHotel, setLoadingHotel] = useState(false);
+  const [hotelDetailFor, setHotelDetailFor] = useState<number | null>(null);
+  const loadingHotel =
+    selectedHotelId !== null && hotelDetailFor !== selectedHotelId;
 
   const [selectedRoomTypeId, setSelectedRoomTypeId] = useState<number | null>(
     cart.room?.roomType.id ?? null,
   );
 
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [loadingRooms, setLoadingRooms] = useState(false);
+  const [roomsLoadedFor, setRoomsLoadedFor] = useState<number | null>(null);
+  const loadingRooms =
+    selectedHotelId !== null && roomsLoadedFor !== selectedHotelId;
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(
     cart.room?.room.id ?? null,
   );
@@ -50,7 +55,6 @@ export function RoomStep() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoadingHotels(true);
     listHotels()
       .then((res) => {
         if (cancelled) return;
@@ -68,21 +72,18 @@ export function RoomStep() {
   }, []);
 
   useEffect(() => {
-    if (selectedHotelId === null) {
-      setHotelDetail(null);
-      return;
-    }
+    if (selectedHotelId === null) return;
     let cancelled = false;
-    setLoadingHotel(true);
-    getHotel(selectedHotelId)
+    const hotelId = selectedHotelId;
+    getHotel(hotelId)
       .then((res) => {
         if (cancelled) return;
         setHotelDetail(res.data);
-        setLoadingHotel(false);
+        setHotelDetailFor(hotelId);
       })
       .catch(() => {
         if (cancelled) return;
-        setLoadingHotel(false);
+        setHotelDetailFor(hotelId);
       });
     return () => {
       cancelled = true;
@@ -90,21 +91,18 @@ export function RoomStep() {
   }, [selectedHotelId]);
 
   useEffect(() => {
-    if (selectedHotelId === null) {
-      setRooms([]);
-      return;
-    }
+    if (selectedHotelId === null) return;
     let cancelled = false;
-    setLoadingRooms(true);
-    listRooms(selectedHotelId)
+    const hotelId = selectedHotelId;
+    listRooms(hotelId)
       .then((res) => {
         if (cancelled) return;
         setRooms(res.data);
-        setLoadingRooms(false);
+        setRoomsLoadedFor(hotelId);
       })
       .catch(() => {
         if (cancelled) return;
-        setLoadingRooms(false);
+        setRoomsLoadedFor(hotelId);
       });
     return () => {
       cancelled = true;
@@ -296,13 +294,13 @@ export function RoomStep() {
           >
             Check-in
           </label>
-          <Input
+          <DatePicker
             id="check-in"
-            type="date"
             className="mt-2"
             min={todayIso()}
             value={checkIn}
-            onChange={(e) => setCheckIn(e.target.value)}
+            onChange={setCheckIn}
+            placeholder="Select check-in"
           />
         </div>
         <div>
@@ -312,13 +310,13 @@ export function RoomStep() {
           >
             Check-out
           </label>
-          <Input
+          <DatePicker
             id="check-out"
-            type="date"
             className="mt-2"
             min={checkIn}
             value={checkOut}
-            onChange={(e) => setCheckOut(e.target.value)}
+            onChange={setCheckOut}
+            placeholder="Select check-out"
           />
         </div>
         <div>
