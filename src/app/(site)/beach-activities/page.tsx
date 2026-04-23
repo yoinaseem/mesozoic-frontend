@@ -3,24 +3,20 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { BeachActivityCard } from '@/components/beach-activities/BeachActivityCard';
-import { getBeachActivities, type BeachActivity } from '@/lib/api/beach-activities';
+import { listBeachActivities } from '@/lib/api/beach-activities';
+import type { BeachActivity } from '@/types/booking';
 
 export default function BeachActivitiesPage() {
   const [activities, setActivities] = useState<BeachActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedActivity, setSelectedActivity] = useState<BeachActivity | null>(null);
-
-  const handleSelect = (activity: BeachActivity) => {
-    setSelectedActivity(prev => prev?.id === activity.id ? null : activity);
-  };
 
   useEffect(() => {
     const fetchActivities = async () => {
       try {
         setLoading(true);
-        const data = await getBeachActivities();
-        setActivities(data);
+        const res = await listBeachActivities();
+        setActivities(res.data);
       } catch (err) {
         setError('Failed to load beach activities');
         console.error(err);
@@ -77,12 +73,7 @@ export default function BeachActivitiesPage() {
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {activities.map((activity) => (
-                  <BeachActivityCard
-                    key={activity.id}
-                    activity={activity}
-                    selected={selectedActivity?.id === activity.id}
-                    onSelect={handleSelect}
-                  />
+                  <BeachActivityCard key={activity.id} activity={activity} />
                 ))}
               </div>
 
@@ -92,21 +83,13 @@ export default function BeachActivitiesPage() {
                   Ready for an adventure?
                 </h2>
                 <p className="text-muted mb-8 max-w-xl mx-auto">
-                  {selectedActivity
-                    ? `You selected: ${selectedActivity.name}`
-                    : 'Select an activity above, then click below to book.'}
+                  Book your beach activity and make unforgettable memories on the island.
                 </p>
-                {selectedActivity ? (
-                  <Link href={`/booking?activity=beach-${selectedActivity.id}`}>
-                    <button className="btn-accent px-8 py-3 text-lg">
-                      Book Your Activity
-                    </button>
-                  </Link>
-                ) : (
-                  <button disabled className="btn-accent px-8 py-3 text-lg opacity-40 cursor-not-allowed">
+                <Link href="/book">
+                  <button className="btn-accent px-8 py-3 text-lg">
                     Book Your Activity
                   </button>
-                )}
+                </Link>
               </div>
             </>
           )}
