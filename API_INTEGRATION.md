@@ -124,14 +124,14 @@ Notes:
 
 Roles seeded by `RolesAndPermissionsSeeder`:
 
-| Role            | Module scope                                    | Notes                                                                                                              |
-| --------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `superadmin`    | everything                                      | `before()` short-circuits every policy.                                                                            |
-| `hotel-manager` | hotels they're assigned to (`hotel_user` pivot) | Can `hotels.update`, full CRUD on `room-types` and `rooms` of those hotels. Cannot create/delete hotels.           |
-| `ferry-manager` | all ferries                                     | Has `ferry.view`, `ferry.create`, `ferry.update`. **No middleware enforces these on ferry routes today** — see §7. |
-| `park-manager`  | (no endpoints yet)                              | Permissions seeded for forward-compat.                                                                             |
-| `beach-manager` | all beach activities                            | Has `beach.view`, `beach.create`, `beach.update`. Wired to routes.                                                 |
-| `customer`      | none                                            | Default role on self-register. No permissions.                                                                     |
+| Role            | Module scope                                    | Notes                                                                                                                                                                        |
+| --------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `superadmin`    | everything                                      | `before()` short-circuits every policy.                                                                                                                                      |
+| `hotel-manager` | hotels they're assigned to (`hotel_user` pivot) | Can `hotels.update`, full CRUD on `room-types` and `rooms` of those hotels. Cannot create/delete hotels.                                                                     |
+| `ferry-manager` | all ferries                                     | Has `ferry.view`, `ferry.create`, `ferry.update`. **No middleware enforces these on ferry routes today** — see §7.                                                           |
+| `park-manager`  | all park bookings                               | Has `bookings.view`, `bookings.update`, `bookings.cancel` — wired to §9 park-bookings routes. **Does not** have `bookings.create` (customers purchase their own day passes). |
+| `beach-manager` | all beach activities                            | Has `beach.view`, `beach.create`, `beach.update`. Wired to routes.                                                                                                           |
+| `customer`      | none                                            | Default role on self-register. No permissions.                                                                                                                               |
 
 Permission strings are `resource.action` (e.g. `hotels.update`, `beach.create`). The full seeded list lives in `database/seeders/RolesAndPermissionsSeeder.php`. Use `user.permissions` from `/auth/me` to drive UI; the server is authoritative.
 
@@ -280,50 +280,105 @@ room_no      string max:255 required, unique within {hotel}
 
 ---
 
-#### 7. Ferries & Ferry Schedules
+#### 7. Ferry Types, Ferries & Ferry Schedules
 
-`Ferry` and `FerrySchedule` controllers return raw model JSON (not Resource classes) — keys come straight from the DB columns + Eloquent timestamps.
+The ferry domain mirrors the Hotel/RoomType/Room shape: **`FerryType`** is the catalogue (price + capacity + description + image), **`Ferry`** is a physical vessel under a type (just `ferry_type_id + name`), and **`FerrySchedule`** is one departure of a vessel. Capacity and price always read through the type; vessels inherit both. Ferry bookings (§12) walk this chain to size capacity and compute totals.
 
-`Ferry` columns: `id, name, description, price (decimal:2), capacity, image, created_at, updated_at`. `GET /ferries/{ferry}` includes `schedules`.
+All ferry-side mutations are gated by `ferry.create | ferry.update | ferry.delete` — `ferry-manager` and `superadmin` can mutate vessels, types, and schedules. (Earlier doc revisions noted these as permissive; that gap is now closed.)
 
-`FerrySchedule` columns: `id, ferry_id, travel_date, departure_time, arrival_date, arrival_time, departure_port, arrival_port, status, created_at, updated_at`. `index`/`show`/`store`/`update` include the parent `ferry` object.
+`status` enum on `FerrySchedule`: `scheduled` (default), `completed`, `cancelled`.
 
-`status` enum: `scheduled` (default), `completed`, `cancelled`.
+##### Ferry Types
 
-##### Ferries
+`FerryTypeResource`:
 
-| Method    | Path               | Auth   | Authorization                                                                                              |
-| --------- | ------------------ | ------ | ---------------------------------------------------------------------------------------------------------- |
-| GET       | `/ferries`         | public | —                                                                                                          |
-| GET       | `/ferries/{ferry}` | public | includes `schedules`                                                                                       |
-| POST      | `/ferries`         | bearer | **only `auth:sanctum` — no permission middleware, no Ferry policy.** Any logged-in user can call it today. |
-| PUT/PATCH | `/ferries/{ferry}` | bearer | same                                                                                                       |
-| DELETE    | `/ferries/{ferry}` | bearer | same                                                                                                       |
+```json
+{
+  "id": 3,
+  "name": "Air Conditioned",
+  "description": "AC saloon ferry",
+  "image": null,
+  "capacity": 80,
+  "price": 60.0,
+  "ferries": [
+    /* FerryResource[] only on `show` */
+  ],
+  "ferries_count": 2, // present on `show`
+  "created_at": "...",
+  "updated_at": "..."
+}
+```
 
-Treat ferry mutations as superadmin/ferry-manager only on the **client**; the server is currently permissive. Hide the UI for everyone else and don't rely on the API for enforcement until this is tightened.
+| Method    | Path                        | Auth   | Permission                                 | Policy                                                    |
+| --------- | --------------------------- | ------ | ------------------------------------------ | --------------------------------------------------------- |
+| GET       | `/ferry-types`              | public | —                                          | —                                                         |
+| GET       | `/ferry-types/{ferry_type}` | public | —                                          | includes `ferries` + `ferries_count`                      |
+| POST      | `/ferry-types`              | bearer | `ferry.create\|ferry.update\|ferry.delete` | `ferry.create`                                            |
+| PUT/PATCH | `/ferry-types/{ferry_type}` | bearer | (any)                                      | `ferry.update`                                            |
+| DELETE    | `/ferry-types/{ferry_type}` | bearer | (any)                                      | superadmin only (`FerryTypePolicy::delete` returns false) |
 
 Validation `POST`:
 
 ```
 name        string max:255 required
 description string nullable
-price       numeric min:0 required
-capacity    integer min:1 required
 image       string max:255 nullable
+capacity    integer min:1 required
+price       numeric min:0 required
 ```
 
-`PATCH`: same with `sometimes`.
+`PATCH`: every field `sometimes`.
+
+##### Ferries (vessels)
+
+`FerryResource`:
+
+```json
+{
+  "id": 9,
+  "ferry_type_id": 3,
+  "name": "Isla Express II",
+  "ferry_type": {
+    /* FerryTypeResource — present when eager-loaded */
+  },
+  "schedules": [
+    /* FerryScheduleResource[] only on `show` */
+  ],
+  "schedules_count": 5, // present on `show`
+  "created_at": "...",
+  "updated_at": "..."
+}
+```
+
+The vessel itself only carries `name` and the FK. Price and capacity live on the linked type — read them through `ferry.ferry_type`.
+
+| Method    | Path               | Auth   | Permission                                 | Policy                                                  |
+| --------- | ------------------ | ------ | ------------------------------------------ | ------------------------------------------------------- |
+| GET       | `/ferries`         | public | —                                          | —                                                       |
+| GET       | `/ferries/{ferry}` | public | —                                          | includes `ferry_type` + `schedules` + `schedules_count` |
+| POST      | `/ferries`         | bearer | `ferry.create\|ferry.update\|ferry.delete` | `ferry.create`                                          |
+| PUT/PATCH | `/ferries/{ferry}` | bearer | (any)                                      | `ferry.update`                                          |
+| DELETE    | `/ferries/{ferry}` | bearer | (any)                                      | superadmin only                                         |
+
+Validation `POST`:
+
+```
+ferry_type_id  required, exists:ferry_types
+name           string max:255 required, unique per (ferry_type_id, name)
+```
+
+`PATCH`: both fields `sometimes`; the composite-unique check still applies, ignoring the current ferry's id. If `ferry_type_id` is omitted on PATCH, the check uses the row's existing type. Duplicate `(ferry_type_id, name)` returns `422` with `errors.name` — the DB has a matching unique index as a backstop, but clients will only ever see the 422.
 
 ##### Ferry Schedules
 
-| Method    | Path                                | Auth                                                |
-| --------- | ----------------------------------- | --------------------------------------------------- |
-| GET       | `/ferry-schedules`                  | public, paginated, includes `ferry`                 |
-| GET       | `/ferry-schedules/{ferry_schedule}` | public, includes `ferry`                            |
-| GET       | `/ferries/{ferry}/schedules`        | public, schedules for one ferry, paginated          |
-| POST      | `/ferry-schedules`                  | bearer (no further checks — same caveat as ferries) |
-| PUT/PATCH | `/ferry-schedules/{ferry_schedule}` | bearer                                              |
-| DELETE    | `/ferry-schedules/{ferry_schedule}` | bearer                                              |
+| Method    | Path                                | Auth                                | Permission                                 |
+| --------- | ----------------------------------- | ----------------------------------- | ------------------------------------------ |
+| GET       | `/ferry-schedules`                  | public, paginated, includes `ferry` | —                                          |
+| GET       | `/ferry-schedules/{ferry_schedule}` | public, includes `ferry`            | —                                          |
+| GET       | `/ferries/{ferry}/schedules`        | public, paginated                   | —                                          |
+| POST      | `/ferry-schedules`                  | bearer                              | `ferry.create\|ferry.update\|ferry.delete` |
+| PUT/PATCH | `/ferry-schedules/{ferry_schedule}` | bearer                              | (any)                                      |
+| DELETE    | `/ferry-schedules/{ferry_schedule}` | bearer                              | (any)                                      |
 
 Validation `POST`:
 
@@ -430,7 +485,344 @@ status        optional, in:pending,confirmed,cancelled  (default: pending)
 
 ---
 
-#### 9. Suggested Next.js Client Layout
+#### 9. Park Bookings
+
+A park booking is a day-pass admission ticket tied to a `Reservation` (the trip envelope containing one or more room bookings). One booking covers `guests` people admitted to `park` on `date`.
+
+The guest count is validated against `Reservation::seatPoolOn(date)` — the sum of confirmed room-booking guests active on that date with **exclusive checkout** (`check_in_date <= date < check_out_date`). This lets a single booking cover a group spread across multiple rooms (e.g. a family of 6 across 3 rooms buys one 6-guest day pass). It also means the check-out date always has a seat pool of 0 and is rejected.
+
+Prerequisite: the caller's reservation must already have at least one confirmed `RoomBooking` covering `date`. The `Reservation`, `RoomBooking`, and `ThemePark` modules are not yet documented in this file — consult the Laravel controllers until a follow-up PR adds them.
+
+`ParkBookingResource`:
+
+```json
+{
+  "id": 42,
+  "reservation_id": 7,
+  "park_id": 1,
+  "date": "2026-05-02",
+  "guests": 6,
+  "status": "confirmed", // confirmed | cancelled
+  "price_per_guest": "45.00",
+  "total_price": "270.00",
+  "cancelled_at": null,
+  "reservation": {
+    /* ReservationResource when eager-loaded */
+  },
+  "park": {
+    /* ThemeParkResource when eager-loaded */
+  },
+  "created_at": "...",
+  "updated_at": "..."
+}
+```
+
+| Method    | Path                            | Auth   | Permission        | Policy                                                          |
+| --------- | ------------------------------- | ------ | ----------------- | --------------------------------------------------------------- |
+| GET       | `/park-bookings`                | bearer | `bookings.view`   | customer sees only their own; park-manager + superadmin see all |
+| GET       | `/park-bookings/{park_booking}` | bearer | `bookings.view`   | owner, park-manager, or superadmin                              |
+| POST      | `/park-bookings`                | bearer | `bookings.create` | superadmin, or customer attaching to their own reservation      |
+| PUT/PATCH | `/park-bookings/{park_booking}` | bearer | `bookings.update` | park-manager or superadmin (customers cannot PATCH)             |
+| DELETE    | `/park-bookings/{park_booking}` | bearer | `bookings.cancel` | owner (only before visit date), park-manager, or superadmin     |
+
+Routes are wired **per-verb** (not pipe-OR) because `customer` has `bookings.create|view|cancel` but not `bookings.update` — a pipe-OR would leak `PATCH` to customers at the middleware layer before the policy could deny it.
+
+Index filters (all optional, AND-combined): `?status=confirmed|cancelled`, `?park_id=`, `?reservation_id=`, `?date=YYYY-MM-DD`. Pagination is Laravel default (15/page).
+
+Validation `POST`:
+
+```
+reservation_id  required, exists:reservations
+park_id         required, exists:theme_parks
+date            required, date, after_or_equal:today
+guests          required, integer, min:1
+```
+
+Additional server-side business rules enforced in `ParkBookingController::store`, each returning `422` with a specific validation key on failure:
+
+- **Ownership** (`errors.reservation_id`): reservation must belong to the caller (superadmin / park-manager bypass).
+- **Seat pool > 0** (`errors.date`): `Reservation::seatPoolOn(date) > 0` — at least one confirmed room active. Check-out date is excluded.
+- **Seat pool cap** (`errors.guests`): `guests <= seatPoolOn(date)`. Partial-group visits (`guests < seatPoolOn`) are allowed.
+- **Park open** (`errors.date`): `ThemePark::isOpenOn(date) === true` (override > baseline > `not_configured` → closed).
+- **Uniqueness** (`errors.date`): no existing confirmed `ParkBooking` for the same `(reservation_id, park_id, date)`. Cancelled rows don't block — cancel, then rebook. Uniqueness is per-park, so the same reservation could hold passes for two different parks on the same date once more parks exist.
+- **Capacity** (`errors.park_id`): `Σ confirmed guests on (park_id, date) + guests <= park.capacity`.
+
+On create, `price_per_guest = park.price` and `total_price = park.price × guests` are derived server-side (any client-submitted values for these fields are ignored). Created rows default to `status="confirmed"`.
+
+Validation `PATCH`:
+
+```
+status  sometimes, in:confirmed,cancelled
+date    sometimes, date
+guests  sometimes, integer, min:1
+```
+
+If `date` or `guests` change, the seat-pool, open-on-date, uniqueness, and capacity checks are re-run against the new values. `total_price` is recomputed when `guests` changes (same `bcmul(price_per_guest × guests, 2)` formula). Setting `status=cancelled` also sets `cancelled_at = now()`.
+
+`DELETE` — soft cancel:
+
+- Sets `status=cancelled` and `cancelled_at=now()`; returns `204` with no body. The row is preserved for audit.
+- Customers can cancel only **before** the visit date (`now()->toDateString() < booking.date`). On or after the visit date, only park-manager / superadmin can cancel.
+
+**Cancellation cascade (known gap).** Cancelling a `RoomBooking` that drops `seatPoolOn(date)` to 0 does **not** auto-cancel attached park bookings today. Treat this on the client as a potential stale-ticket risk until the cascade lands. Tracked as a follow-up against `RoomBookingController::enforceSeatPoolInvariantOrFail`.
+
+**Multi-park note.** The database currently holds a hard limit of one `ThemePark`. The controller and uniqueness rule are already multi-park-ready — when more parks are added, the per-park uniqueness key supports splits (parents at Park A, kids at Park B on the same date) without code changes.
+
+---
+
+#### 10. Beach Bookings
+
+A beach booking is a session ticket tied to a single `BeachActivitySchedule` (the specific `activity_date + start_time` slot of a `BeachActivity`). One booking covers `guests` people for that slot. The booking date is derived from the schedule — there is no separate `date` column on the booking.
+
+Same reservation-tie rule as park bookings: the caller's `Reservation` must have a confirmed `RoomBooking` covering the schedule's `activity_date`, and `guests` must fit inside `Reservation::seatPoolOn(activity_date)`. Exclusive checkout applies, so a booking on the room's check-out date is rejected.
+
+**Divergence from park bookings — cancellation is staff-only.** Customers cannot cancel their own beach bookings; only `beach-manager` / `superadmin` can. This is enforced in `BeachBookingPolicy::delete` (no owner branch, unlike `ParkBookingPolicy`).
+
+`BeachBookingResource`:
+
+```json
+{
+  "id": 31,
+  "reservation_id": 7,
+  "beach_activity_schedule_id": 12,
+  "guests": 2,
+  "status": "confirmed", // confirmed | cancelled
+  "price_per_guest": "75.00",
+  "total_price": "150.00",
+  "cancelled_at": null,
+  "reservation": {
+    /* ReservationResource when eager-loaded */
+  },
+  "schedule": {
+    /* BeachActivityScheduleResource when eager-loaded (includes `activity`) */
+  },
+  "created_at": "...",
+  "updated_at": "..."
+}
+```
+
+| Method    | Path                              | Auth   | Permission        | Policy                                                           |
+| --------- | --------------------------------- | ------ | ----------------- | ---------------------------------------------------------------- |
+| GET       | `/beach-bookings`                 | bearer | `bookings.view`   | customer sees only their own; beach-manager + superadmin see all |
+| GET       | `/beach-bookings/{beach_booking}` | bearer | `bookings.view`   | owner, beach-manager, or superadmin                              |
+| POST      | `/beach-bookings`                 | bearer | `bookings.create` | superadmin, or customer attaching to their own reservation       |
+| PUT/PATCH | `/beach-bookings/{beach_booking}` | bearer | `bookings.update` | beach-manager or superadmin (customers cannot PATCH)             |
+| DELETE    | `/beach-bookings/{beach_booking}` | bearer | `bookings.cancel` | beach-manager or superadmin only (customers cannot cancel)       |
+
+Routes are wired **per-verb** (not pipe-OR) — same reasoning as `/park-bookings`.
+
+Index filters (all optional, AND-combined): `?status=confirmed|cancelled`, `?beach_activity_schedule_id=`, `?beach_activity_id=`, `?reservation_id=`, `?date=YYYY-MM-DD`. Pagination is Laravel default (15/page).
+
+Validation `POST`:
+
+```
+reservation_id              required, exists:reservations
+beach_activity_schedule_id  required, exists:beach_activity_schedules
+guests                      required, integer, min:1
+```
+
+Additional server-side business rules enforced in `BeachBookingController::store`, each returning `422` with a specific validation key on failure:
+
+- **Ownership** (`errors.reservation_id`): reservation must belong to the caller (superadmin / beach-manager bypass).
+- **Schedule bookable** (`errors.beach_activity_schedule_id`): schedule `status` is not `cancelled`, and `activity_date` is not in the past.
+- **Seat pool > 0** (`errors.beach_activity_schedule_id`): `Reservation::seatPoolOn(activity_date) > 0` — at least one confirmed room covers the date.
+- **Seat pool cap** (`errors.guests`): `guests <= seatPoolOn(activity_date)`.
+- **Uniqueness** (`errors.beach_activity_schedule_id`): no existing confirmed `BeachBooking` for the same `(reservation_id, beach_activity_schedule_id)`. Cancelled rows don't block — staff can cancel, customer can rebook.
+- **Capacity** (`errors.beach_activity_schedule_id`): `Σ confirmed guests on the schedule + guests <= activity.capacity`.
+
+On create, `price_per_guest = activity.price` and `total_price = activity.price × guests` are derived server-side. Created rows default to `status="confirmed"` (no pending state — if capacity allows and every rule passes, the booking confirms immediately).
+
+Validation `PATCH`:
+
+```
+status  sometimes, in:confirmed,cancelled
+guests  sometimes, integer, min:1
+```
+
+If `guests` changes, seat-pool and capacity checks are re-run. `total_price` is recomputed. Setting `status=cancelled` also sets `cancelled_at = now()`. The schedule is not swappable on PATCH — cancel and re-book to change slots.
+
+`DELETE` — soft cancel (staff-only):
+
+- Sets `status=cancelled` and `cancelled_at=now()`; returns `204` with no body. Row preserved for audit.
+- A customer call returns `403` — only `beach-manager` / `superadmin` pass the policy.
+
+**Cancellation cascade** — same known gap as park bookings: cancelling the underlying `RoomBooking` does not auto-cancel attached beach bookings today.
+
+---
+
+#### 11. Park Activity Bookings
+
+A park activity booking is a session ticket tied to a single `ParkActivitySchedule` (which pins a `ParkActivity` to a date + start_time within a `ThemePark`). One booking covers `guests` people for that session. Booking date is derived from `schedule.date` — no separate `date` column.
+
+**Coupling rule — prerequisite `ParkBooking` required.** Unlike beach bookings, a park activity booking requires the caller's `Reservation` to already hold a confirmed `ParkBooking` (day-pass) for the same park on the same date. The activity-booking guest count must also be ≤ the day-pass guest count. Rationale: you need park admission to attend an activity inside it.
+
+The standard seat-pool rule still applies in addition to the coupling rule (guard against stale tickets if a room-booking cancellation left a day-pass orphaned — see known gap below).
+
+**Cancellation is staff-only** (same as beach bookings; diverges from park day-pass bookings).
+
+`ParkActivityBookingResource`:
+
+```json
+{
+  "id": 54,
+  "reservation_id": 7,
+  "park_activity_schedule_id": 18,
+  "guests": 2,
+  "status": "confirmed", // confirmed | cancelled
+  "price_per_guest": "30.00",
+  "total_price": "60.00",
+  "cancelled_at": null,
+  "reservation": {
+    /* ReservationResource when eager-loaded */
+  },
+  "schedule": {
+    /* ParkActivityScheduleResource when eager-loaded (includes `activity` + park) */
+  },
+  "created_at": "...",
+  "updated_at": "..."
+}
+```
+
+| Method    | Path                                              | Auth   | Permission        | Policy                                                          |
+| --------- | ------------------------------------------------- | ------ | ----------------- | --------------------------------------------------------------- |
+| GET       | `/park-activity-bookings`                         | bearer | `bookings.view`   | customer sees only their own; park-manager + superadmin see all |
+| GET       | `/park-activity-bookings/{park_activity_booking}` | bearer | `bookings.view`   | owner, park-manager, or superadmin                              |
+| POST      | `/park-activity-bookings`                         | bearer | `bookings.create` | superadmin, or customer attaching to their own reservation      |
+| PUT/PATCH | `/park-activity-bookings/{park_activity_booking}` | bearer | `bookings.update` | park-manager or superadmin (customers cannot PATCH)             |
+| DELETE    | `/park-activity-bookings/{park_activity_booking}` | bearer | `bookings.cancel` | park-manager or superadmin only (customers cannot cancel)       |
+
+Routes are per-verb (not pipe-OR) — same reasoning as `/park-bookings` and `/beach-bookings`.
+
+Index filters (all optional, AND-combined): `?status=confirmed|cancelled`, `?park_activity_schedule_id=`, `?park_activity_id=`, `?park_id=`, `?reservation_id=`, `?date=YYYY-MM-DD`. Pagination is Laravel default (15/page).
+
+Validation `POST`:
+
+```
+reservation_id             required, exists:reservations
+park_activity_schedule_id  required, exists:park_activity_schedules
+guests                     required, integer, min:1
+```
+
+Additional server-side business rules enforced in `ParkActivityBookingController::store`, each returning `422` with a specific validation key on failure:
+
+- **Ownership** (`errors.reservation_id`): reservation must belong to the caller (superadmin / park-manager bypass).
+- **Schedule bookable** (`errors.park_activity_schedule_id`): schedule `status === 'scheduled'` (not `cancelled` / `completed`) and `date >= today`.
+- **Park open** (`errors.park_activity_schedule_id`): `ThemePark::isOpenOn(date) === true`.
+- **Seat pool > 0** (`errors.park_activity_schedule_id`): `Reservation::seatPoolOn(date) > 0`.
+- **Seat pool cap** (`errors.guests`): `guests <= seatPoolOn(date)`.
+- **Day-pass prerequisite** (`errors.reservation_id`): reservation must hold a confirmed `ParkBooking` for `(park_id, date)`.
+- **Day-pass cap** (`errors.guests`): `guests <= day-pass.guests`.
+- **Uniqueness** (`errors.park_activity_schedule_id`): no existing confirmed `ParkActivityBooking` for the same `(reservation_id, schedule_id)`.
+- **Capacity** (`errors.park_activity_schedule_id`): `Σ confirmed guests on the schedule + guests <= activity.max_capacity`.
+
+On create, `price_per_guest = activity.price`, `total_price = bcmul(activity.price, guests, 2)`. Rows default to `status="confirmed"`.
+
+Validation `PATCH`:
+
+```
+status  sometimes, in:confirmed,cancelled
+guests  sometimes, integer, min:1
+```
+
+If `guests` changes, seat-pool, day-pass, and capacity checks are re-run; `total_price` is recomputed. Schedule swap is not supported on PATCH — cancel and re-book.
+
+`DELETE` — soft cancel (staff-only): sets `status=cancelled`, `cancelled_at=now()`, returns `204`. Customer call → `403`.
+
+**Cancellation cascade** — same known gap shared by park and beach bookings: cancelling the underlying `RoomBooking` or `ParkBooking` does not auto-cancel attached activity bookings.
+
+---
+
+#### 12. Ferry Bookings
+
+A ferry booking is a trip ticket tied to a specific `FerrySchedule` (which pins a `Ferry` to `travel_date + departure_time` and carries `arrival_date/time + departure_port + arrival_port`). One booking covers `guests` people on that departure.
+
+**Divergence from on-island bookings — inclusive reservation window.** Park, beach, and park-activity bookings reject the check-out date because on-island service tickets use `seatPoolOn(date)` with exclusive checkout. Ferries are transport, so the check-out-day departure ferry is a primary use case. They use a sibling helper `Reservation::ferrySeatPoolOn(date)` with the inclusive window `check_in_date <= travel_date <= check_out_date`. Arrival-day ferries on `check_in_date` are bookable the same way.
+
+**Auto-confirm on create.** If every rule passes (ownership, schedule bookable, reservation covers travel date, no duplicate, capacity), `status=confirmed` immediately. If the vessel is full, the booking is rejected with `"There is no available space on this ferry."`
+
+**Cancellation is staff-only** (matches beach and park-activity bookings; diverges from park day-pass bookings).
+
+**No direction or port validation.** `departure_port` / `arrival_port` are free-text strings, so the server cannot classify a schedule as arrival vs. departure vs. inter-island. The frontend displays the schedule as-is.
+
+**No round-trip coupling.** A reservation can hold any number of ferry bookings on different schedules — e.g. outbound + return on the same day are two separate bookings on two `FerrySchedule` rows.
+
+`FerryBookingResource`:
+
+```json
+{
+  "id": 77,
+  "reservation_id": 7,
+  "ferry_schedule_id": 22,
+  "guests": 2,
+  "status": "confirmed", // confirmed | cancelled
+  "price_per_guest": "40.00",
+  "total_price": "80.00",
+  "cancelled_at": null,
+  "reservation": {
+    /* ReservationResource when eager-loaded */
+  },
+  "schedule": {
+    /* FerryScheduleResource when eager-loaded (includes `ferry`) */
+  },
+  "created_at": "...",
+  "updated_at": "..."
+}
+```
+
+| Method    | Path                              | Auth   | Permission        | Policy                                                           |
+| --------- | --------------------------------- | ------ | ----------------- | ---------------------------------------------------------------- |
+| GET       | `/ferry-bookings`                 | bearer | `bookings.view`   | customer sees only their own; ferry-manager + superadmin see all |
+| GET       | `/ferry-bookings/{ferry_booking}` | bearer | `bookings.view`   | owner, ferry-manager, or superadmin                              |
+| POST      | `/ferry-bookings`                 | bearer | `bookings.create` | superadmin, or customer attaching to their own reservation       |
+| PUT/PATCH | `/ferry-bookings/{ferry_booking}` | bearer | `bookings.update` | ferry-manager or superadmin                                      |
+| DELETE    | `/ferry-bookings/{ferry_booking}` | bearer | `bookings.cancel` | ferry-manager or superadmin only (customers cannot cancel)       |
+
+Routes are per-verb — same reasoning as the other booking modules.
+
+Index filters (all optional, AND-combined): `?status=confirmed|cancelled`, `?ferry_schedule_id=`, `?ferry_id=`, `?reservation_id=`, `?travel_date=YYYY-MM-DD`. Pagination is Laravel default (15/page).
+
+Validation `POST`:
+
+```
+reservation_id     required, exists:reservations
+ferry_schedule_id  required, exists:ferry_schedules
+guests             required, integer, min:1
+```
+
+Business rules enforced in `FerryBookingController::store`:
+
+- **Ownership** (`errors.reservation_id`): reservation must belong to the caller (superadmin / ferry-manager bypass).
+- **Schedule bookable** (`errors.ferry_schedule_id`): schedule `status === 'scheduled'` (not `cancelled` / `completed`) and `travel_date >= today`.
+- **Reservation covers travel date** (`errors.ferry_schedule_id`): `Reservation::ferrySeatPoolOn(travel_date) > 0` with inclusive check-in + check-out.
+- **Seat pool cap** (`errors.guests`): `guests <= ferrySeatPoolOn(travel_date)`.
+- **Uniqueness** (`errors.ferry_schedule_id`): no existing confirmed `FerryBooking` for `(reservation_id, ferry_schedule_id)`. Same ferry on the same date at a different departure time is a different schedule → allowed.
+- **Capacity** (`errors.ferry_schedule_id`): `Σ confirmed guests on the schedule + guests <= ferry.ferry_type.capacity`. Capacity lives on the type after the Hotel/RoomType-style restructure — vessels inherit it. Error message: `"There is no available space on this ferry."`
+
+On create, `price_per_guest = ferry.ferry_type.price`, `total_price = bcmul(price_per_guest, guests, 2)`. Rows default to `status="confirmed"`.
+
+Validation `PATCH`:
+
+```
+status  sometimes, in:confirmed,cancelled
+guests  sometimes, integer, min:1
+```
+
+If `guests` changes, seat-pool and capacity checks are re-run; `total_price` is recomputed. Schedule swap is not supported on PATCH.
+
+**Status transitions.** Only `confirmed → cancelled` (and no-ops) are accepted. **`cancelled → confirmed` is rejected with `422` on `status`** — re-confirming a cancelled row would need the full create-time invariant chain (schedule bookability, per-reservation-per-schedule uniqueness, seat pool, ferry capacity) to be re-run against the current world, and a customer asking to "undo" a cancellation should create a new booking instead. Client UX: on a cancelled row, hide/disable any "re-activate" affordance; surface a "book again" action that posts a fresh `POST /ferry-bookings`.
+
+| From ↓ / To → | `confirmed`         | `cancelled`                       |
+| ------------- | ------------------- | --------------------------------- |
+| `confirmed`   | no-op (200)         | cancel (200, sets `cancelled_at`) |
+| `cancelled`   | **422 on `status`** | no-op (200)                       |
+
+`DELETE` — soft cancel (staff-only): sets `status=cancelled`, `cancelled_at=now()`, returns `204`. Customer call → `403`.
+
+**Cancellation cascade** — same known gap as the other booking modules: cancelling the underlying `RoomBooking` does not auto-cancel attached ferry bookings.
+
+---
+
+#### 13. Suggested Next.js Client Layout
 
 A minimal sketch — adapt to your routing conventions.
 
@@ -495,7 +887,7 @@ if (res.status === 422) {
 
 ---
 
-#### 10. Quick Reference: Endpoint Index
+#### 14. Quick Reference: Endpoint Index
 
 ```
 PUBLIC
@@ -509,6 +901,8 @@ GET    /api/beach-activities
 GET    /api/beach-activities/{beach_activity}
 GET    /api/beach-activities/{beach_activity}/schedules
 GET    /api/beach-activities/{beach_activity}/schedules/{schedule}
+GET    /api/ferry-types
+GET    /api/ferry-types/{ferry_type}
 GET    /api/ferries
 GET    /api/ferries/{ferry}
 GET    /api/ferries/{ferry}/schedules
@@ -547,11 +941,39 @@ POST   /api/beach-activities/{beach_activity}/schedules       [beach.create]
 PUT    /api/beach-activities/{beach_activity}/schedules/{schedule}  [beach.update]
 DELETE /api/beach-activities/{beach_activity}/schedules/{schedule}  [superadmin]
 
-POST   /api/ferries                                           [auth-only — see §7]
-PUT    /api/ferries/{ferry}                                   [auth-only]
-DELETE /api/ferries/{ferry}                                   [auth-only]
+POST   /api/ferry-types                                       [ferry.create → ferry-manager or superadmin]
+PUT    /api/ferry-types/{ferry_type}                          [ferry.update → ferry-manager or superadmin]
+DELETE /api/ferry-types/{ferry_type}                          [superadmin]
 
-POST   /api/ferry-schedules                                   [auth-only]
-PUT    /api/ferry-schedules/{ferry_schedule}                  [auth-only]
-DELETE /api/ferry-schedules/{ferry_schedule}                  [auth-only]
+POST   /api/ferries                                           [ferry.create → ferry-manager or superadmin]
+PUT    /api/ferries/{ferry}                                   [ferry.update → ferry-manager or superadmin]
+DELETE /api/ferries/{ferry}                                   [superadmin]
+
+POST   /api/ferry-schedules                                   [ferry.create → ferry-manager or superadmin]
+PUT    /api/ferry-schedules/{ferry_schedule}                  [ferry.update → ferry-manager or superadmin]
+DELETE /api/ferry-schedules/{ferry_schedule}                  [ferry.delete → superadmin]
+
+GET    /api/park-bookings                                     [bookings.view — customer: own only; park-manager/superadmin: all]
+GET    /api/park-bookings/{park_booking}                      [bookings.view]
+POST   /api/park-bookings                                     [bookings.create — customer attaches to own reservation]
+PUT    /api/park-bookings/{park_booking}                      [bookings.update — park-manager or superadmin]
+DELETE /api/park-bookings/{park_booking}                      [bookings.cancel — owner before visit date, or park-manager/superadmin]
+
+GET    /api/beach-bookings                                    [bookings.view — customer: own only; beach-manager/superadmin: all]
+GET    /api/beach-bookings/{beach_booking}                    [bookings.view]
+POST   /api/beach-bookings                                    [bookings.create — customer attaches to own reservation]
+PUT    /api/beach-bookings/{beach_booking}                    [bookings.update — beach-manager or superadmin]
+DELETE /api/beach-bookings/{beach_booking}                    [bookings.cancel — beach-manager or superadmin only]
+
+GET    /api/park-activity-bookings                            [bookings.view — customer: own only; park-manager/superadmin: all]
+GET    /api/park-activity-bookings/{park_activity_booking}    [bookings.view]
+POST   /api/park-activity-bookings                            [bookings.create — requires prerequisite day-pass (ParkBooking)]
+PUT    /api/park-activity-bookings/{park_activity_booking}    [bookings.update — park-manager or superadmin]
+DELETE /api/park-activity-bookings/{park_activity_booking}    [bookings.cancel — park-manager or superadmin only]
+
+GET    /api/ferry-bookings                                    [bookings.view — customer: own only; ferry-manager/superadmin: all]
+GET    /api/ferry-bookings/{ferry_booking}                    [bookings.view]
+POST   /api/ferry-bookings                                    [bookings.create — inclusive room-booking window]
+PUT    /api/ferry-bookings/{ferry_booking}                    [bookings.update — ferry-manager or superadmin]
+DELETE /api/ferry-bookings/{ferry_booking}                    [bookings.cancel — ferry-manager or superadmin only]
 ```
