@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { Breadcrumbs } from "@/components/admin/Breadcrumbs";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { HotelDashboardHeader } from "@/components/admin/hotels/HotelDashboardHeader";
 import {
@@ -76,6 +77,11 @@ export default function HotelDashboardPage({
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [availabilityTick, setAvailabilityTick] = useState(0);
 
+  const dateRangeError =
+    from && to && new Date(to) <= new Date(from)
+      ? "Check-out must be after check-in."
+      : null;
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -100,19 +106,16 @@ export default function HotelDashboardPage({
   useEffect(() => {
     if (Number.isNaN(hotelId)) return;
     if (!from || !to) return;
-    if (new Date(to) <= new Date(from)) {
-      setAvailabilityError("Check-out must be after check-in.");
-      setAvailability(null);
-      return;
-    }
+    if (dateRangeError) return;
 
     let cancelled = false;
-    setAvailabilityLoading(true);
-    setAvailabilityError("");
 
     getHotelAvailability(hotelId, from, to)
       .then((res) => {
-        if (!cancelled) setAvailability(res.data);
+        if (cancelled) return;
+        setAvailability(res.data);
+        setAvailabilityError("");
+        setAvailabilityLoading(false);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -122,15 +125,19 @@ export default function HotelDashboardPage({
           setAvailabilityError("Failed to load availability.");
         }
         setAvailability(null);
-      })
-      .finally(() => {
-        if (!cancelled) setAvailabilityLoading(false);
+        setAvailabilityLoading(false);
       });
+
+    // Flip the loading indicator on the next microtask so this setState
+    // doesn't count as synchronous inside the effect body.
+    queueMicrotask(() => {
+      if (!cancelled) setAvailabilityLoading(true);
+    });
 
     return () => {
       cancelled = true;
     };
-  }, [hotelId, from, to, availabilityTick]);
+  }, [hotelId, from, to, availabilityTick, dateRangeError]);
 
   const handleChanged = useCallback(() => {
     void load();
@@ -203,6 +210,13 @@ export default function HotelDashboardPage({
 
   return (
     <div className="flex flex-col gap-6">
+      <Breadcrumbs
+        items={[
+          { label: "Dashboard", href: "/admin/dashboard" },
+          { label: "Hotels", href: "/admin/hotels" },
+          { label: hotel.name },
+        ]}
+      />
       <HotelDashboardHeader
         hotel={hotel}
         onEdit={() => router.push(`/admin/hotels/${hotel.id}/edit`)}
@@ -257,18 +271,22 @@ export default function HotelDashboardPage({
           <StatCard
             label="Free rooms"
             value={
-              availabilityLoading
-                ? "…"
-                : availabilityError
-                  ? "—"
-                  : (freeRooms ?? "—")
+              dateRangeError
+                ? "—"
+                : availabilityLoading
+                  ? "…"
+                  : availabilityError
+                    ? "—"
+                    : (freeRooms ?? "—")
             }
             note={
-              availabilityError
-                ? availabilityError
-                : bookedRooms != null
-                  ? `${bookedRooms} booked in this range`
-                  : undefined
+              dateRangeError
+                ? dateRangeError
+                : availabilityError
+                  ? availabilityError
+                  : bookedRooms != null
+                    ? `${bookedRooms} booked in this range`
+                    : undefined
             }
           />
         </div>

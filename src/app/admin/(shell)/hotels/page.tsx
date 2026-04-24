@@ -3,15 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import {
-  ArrowRightIcon,
-  HotelIcon,
-  PencilIcon,
-  PlusIcon,
-  Trash2Icon,
-} from "lucide-react";
+import { HotelIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
-
+import { Breadcrumbs } from "@/components/admin/Breadcrumbs";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { EmptyState } from "@/components/admin/EmptyState";
@@ -72,7 +66,9 @@ export default function HotelsPage() {
     {
       key: "name",
       header: "Name",
-      cell: (hotel) => <span className="font-medium">{hotel.name}</span>,
+      cell: (hotel) => (
+        <span className="font-medium group-hover:underline">{hotel.name}</span>
+      ),
     },
     {
       key: "address",
@@ -100,13 +96,11 @@ export default function HotelsPage() {
           },
         ];
         return (
-          <div className="flex items-center justify-end gap-2">
-            <Button asChild size="sm" variant="outline">
-              <Link href={`/admin/hotels/${hotel.id}`}>
-                View details
-                <ArrowRightIcon />
-              </Link>
-            </Button>
+          <div
+            className="flex items-center justify-end gap-2"
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => event.stopPropagation()}
+          >
             <RowActions items={items} />
           </div>
         );
@@ -156,6 +150,12 @@ export default function HotelsPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-4">
+      <Breadcrumbs
+        items={[
+          { label: "Dashboard", href: "/admin/dashboard" },
+          { label: "Hotels" },
+        ]}
+      />
       <PageHeader
         title="Hotels"
         description="Manage accommodations on the isle."
@@ -176,6 +176,7 @@ export default function HotelsPage() {
         rows={rows}
         state={state}
         getRowId={(hotel) => hotel.id}
+        onRowClick={(hotel) => router.push(`/admin/hotels/${hotel.id}`)}
         errorMessage={errorMessage}
         emptyState={emptyState}
         pagination={

@@ -6,6 +6,7 @@ import { Fragment, useState } from "react";
 import {
   BedIcon,
   ChevronRightIcon,
+  HashIcon,
   PencilIcon,
   PlusIcon,
   Trash2Icon,
@@ -53,8 +54,6 @@ function formatPrice(price: string | null): string {
   return `$${n.toFixed(2)}`;
 }
 
-const COLUMN_COUNT = 7;
-
 export function RoomTypesSection({
   hotel,
   availabilityByTypeId,
@@ -65,6 +64,9 @@ export function RoomTypesSection({
   const canCreate = hasPermission("room-types.create");
   const [pendingDelete, setPendingDelete] = useState<RoomType | null>(null);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [showIds, setShowIds] = useState(false);
+
+  const columnCount = showIds ? 8 : 7;
 
   const roomTypes = hotel.room_types ?? [];
 
@@ -97,16 +99,27 @@ export function RoomTypesSection({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h2 className="text-lg font-medium">Room types</h2>
-        {canCreate ? (
-          <Button asChild size="sm">
-            <Link href={`/admin/hotels/${hotel.id}/room-types/new`}>
-              <PlusIcon />
-              New room type
-            </Link>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant={showIds ? "secondary" : "outline"}
+            onClick={() => setShowIds((prev) => !prev)}
+            aria-pressed={showIds}
+          >
+            <HashIcon />
+            {showIds ? "Hide IDs" : "Show IDs"}
           </Button>
-        ) : null}
+          {canCreate ? (
+            <Button asChild size="sm">
+              <Link href={`/admin/hotels/${hotel.id}/room-types/new`}>
+                <PlusIcon />
+                New room type
+              </Link>
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {roomTypes.length === 0 ? (
@@ -137,6 +150,9 @@ export function RoomTypesSection({
             <TableHeader>
               <TableRow>
                 <TableHead className="w-10" />
+                {showIds ? (
+                  <TableHead className="w-[5rem]">ID</TableHead>
+                ) : null}
                 <TableHead>Name</TableHead>
                 <TableHead className="w-[6rem]">Capacity</TableHead>
                 <TableHead className="w-[8rem]">Price / night</TableHead>
@@ -186,6 +202,11 @@ export function RoomTypesSection({
                           aria-hidden
                         />
                       </TableCell>
+                      {showIds ? (
+                        <TableCell className="font-mono text-xs text-muted-foreground">
+                          {rt.id}
+                        </TableCell>
+                      ) : null}
                       <TableCell className="font-medium">{rt.name}</TableCell>
                       <TableCell>{rt.capacity ?? "—"}</TableCell>
                       <TableCell>{formatPrice(rt.price)}</TableCell>
@@ -208,11 +229,12 @@ export function RoomTypesSection({
                     </TableRow>
                     {isExpanded ? (
                       <TableRow className="bg-muted/30 hover:bg-muted/30">
-                        <TableCell colSpan={COLUMN_COUNT} className="p-0">
+                        <TableCell colSpan={columnCount} className="p-0">
                           <RoomTypeRoomsPanel
                             hotelId={hotel.id}
                             roomType={rt}
                             rooms={info?.rooms ?? null}
+                            showIds={showIds}
                             onChanged={onChanged}
                           />
                         </TableCell>

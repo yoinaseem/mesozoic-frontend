@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 
+import { Breadcrumbs } from "@/components/admin/Breadcrumbs";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { HotelForm } from "@/components/admin/hotels/HotelForm";
 import { Spinner } from "@/components/ui/spinner";
@@ -16,25 +17,22 @@ export default function EditHotelPage({
 }) {
   const { id } = use(params);
   const hotelId = Number(id);
+  const invalidHotelId = Number.isNaN(hotelId);
 
   const [hotel, setHotel] = useState<Hotel | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!invalidHotelId);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (Number.isNaN(hotelId)) {
-      setError("Invalid hotel id.");
-      setLoading(false);
-      return;
-    }
-
+    if (invalidHotelId) return;
     let cancelled = false;
-    setLoading(true);
-    setError("");
 
     getHotel(hotelId)
       .then((res) => {
-        if (!cancelled) setHotel(res.data);
+        if (cancelled) return;
+        setHotel(res.data);
+        setError("");
+        setLoading(false);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -43,15 +41,21 @@ export default function EditHotelPage({
         } else {
           setError("Failed to load hotel.");
         }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        setLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [hotelId]);
+  }, [hotelId, invalidHotelId]);
+
+  if (invalidHotelId) {
+    return (
+      <p className="py-20 text-center text-sm text-destructive">
+        Invalid hotel id.
+      </p>
+    );
+  }
 
   if (loading) {
     return (
@@ -77,7 +81,17 @@ export default function EditHotelPage({
 
   return (
     <PermissionGate permission="hotels.update">
-      <HotelForm mode={{ kind: "edit", initial: hotel }} />
+      <div className="flex flex-1 flex-col gap-4">
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", href: "/admin/dashboard" },
+            { label: "Hotels", href: "/admin/hotels" },
+            { label: hotel.name, href: `/admin/hotels/${hotel.id}` },
+            { label: "Edit" },
+          ]}
+        />
+        <HotelForm mode={{ kind: "edit", initial: hotel }} />
+      </div>
     </PermissionGate>
   );
 }

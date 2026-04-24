@@ -19,6 +19,7 @@ type RoomTypeRoomsPanelProps = {
   hotelId: number;
   roomType: RoomType;
   rooms: HotelAvailabilityRoom[] | null;
+  showIds?: boolean;
   onChanged: () => void;
 };
 
@@ -26,6 +27,7 @@ export function RoomTypeRoomsPanel({
   hotelId,
   roomType,
   rooms,
+  showIds = false,
   onChanged,
 }: RoomTypeRoomsPanelProps) {
   const { hasPermission } = useAuth();
@@ -79,6 +81,7 @@ export function RoomTypeRoomsPanel({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40 text-left text-xs font-medium text-muted-foreground">
+                {showIds ? <th className="w-[5rem] px-3 py-2">ID</th> : null}
                 <th className="px-3 py-2">Room Number</th>
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2 text-right">
@@ -89,6 +92,11 @@ export function RoomTypeRoomsPanel({
             <tbody className="divide-y">
               {rooms.map((room) => (
                 <tr key={room.room_id}>
+                  {showIds ? (
+                    <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
+                      {room.room_id}
+                    </td>
+                  ) : null}
                   <td className="px-3 py-2 font-medium">{room.room_no}</td>
                   <td className="px-3 py-2">
                     <StatusBadge variant={room.free ? "success" : "muted"}>
