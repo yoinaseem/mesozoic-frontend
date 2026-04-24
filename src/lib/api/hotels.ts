@@ -35,6 +35,28 @@ export async function getHotel(hotelId: number) {
   return apiRequest<{ data: Hotel }>(`/hotels/${hotelId}`, { skipAuth: true });
 }
 
+export type HotelInput = {
+  name: string;
+  address?: string | null;
+  description?: string | null;
+  amenities?: string[] | null;
+  image?: string | null;
+};
+
+export async function createHotel(input: HotelInput) {
+  return apiRequest<{ data: Hotel }>(`/hotels`, {
+    method: "POST",
+    body: input,
+  });
+}
+
+export async function updateHotel(hotelId: number, input: Partial<HotelInput>) {
+  return apiRequest<{ data: Hotel }>(`/hotels/${hotelId}`, {
+    method: "PATCH",
+    body: input,
+  });
+}
+
 export async function deleteHotel(hotelId: number) {
   return apiRequest<null>(`/hotels/${hotelId}`, { method: "DELETE" });
 }
