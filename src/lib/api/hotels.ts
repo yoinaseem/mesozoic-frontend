@@ -1,6 +1,12 @@
 import { apiRequest } from "@/lib/api-client";
 import type { Paginated } from "@/types/auth";
-import type { Hotel, Room } from "@/types/booking";
+import type { Hotel } from "@/types/booking";
+
+export type HotelAvailabilityRoom = {
+  room_id: number;
+  room_no: string;
+  free: boolean;
+};
 
 export type HotelAvailability = {
   hotel_id: number;
@@ -15,6 +21,7 @@ export type HotelAvailability = {
     total: number;
     booked: number;
     free: number;
+    rooms: HotelAvailabilityRoom[];
   }[];
 };
 
@@ -43,10 +50,4 @@ export async function getHotelAvailability(
   const query = params.toString();
   const path = `/hotels/${hotelId}/availability${query ? `?${query}` : ""}`;
   return apiRequest<{ data: HotelAvailability }>(path, { skipAuth: true });
-}
-
-export async function listRooms(hotelId: number, page = 1) {
-  return apiRequest<Paginated<Room>>(`/hotels/${hotelId}/rooms?page=${page}`, {
-    skipAuth: true,
-  });
 }

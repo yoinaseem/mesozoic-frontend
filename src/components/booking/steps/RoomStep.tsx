@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { useBookingCart } from "@/context/booking-cart-context";
-import { getHotel, listHotels, listRooms } from "@/lib/api/hotels";
+import { getHotel, listHotels } from "@/lib/api/hotels";
+import { listRooms } from "@/lib/api/rooms";
 import type { Hotel, Room, RoomType } from "@/types/booking";
 
 function todayIso(): string {
@@ -203,7 +204,9 @@ export function RoomStep() {
                   aria-pressed={active}
                 >
                   <p className="font-semibold text-primary">{hotel.name}</p>
-                  <p className="text-muted mt-1 text-sm">{hotel.address ?? "—"}</p>
+                  <p className="text-muted mt-1 text-sm">
+                    {hotel.address ?? "—"}
+                  </p>
                 </button>
               );
             })}
@@ -265,13 +268,17 @@ export function RoomStep() {
           {loadingRooms ? (
             <p className="text-muted text-sm">Loading rooms…</p>
           ) : roomsForType.length === 0 ? (
-            <p className="text-muted text-sm">No rooms available for this type.</p>
+            <p className="text-muted text-sm">
+              No rooms available for this type.
+            </p>
           ) : (
             <select
               id="room-select"
               value={selectedRoomId ?? ""}
               onChange={(e) =>
-                setSelectedRoomId(e.target.value ? Number(e.target.value) : null)
+                setSelectedRoomId(
+                  e.target.value ? Number(e.target.value) : null,
+                )
               }
               className="border-base bg-surface focus:ring-primary h-10 w-full rounded-md border px-3 text-sm focus:outline-none focus:ring-2"
             >

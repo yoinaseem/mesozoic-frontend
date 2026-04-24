@@ -1,17 +1,19 @@
 "use client";
 
 import { format } from "date-fns";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { HotelDashboardHeader } from "@/components/admin/hotels/HotelDashboardHeader";
-import { RoomTypesTab } from "@/components/admin/hotels/RoomTypesTab";
+import {
+  RoomTypesSection,
+  type RoomTypeAvailability,
+} from "@/components/admin/hotels/RoomTypesSection";
 import { Card, CardContent } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Spinner } from "@/components/ui/spinner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiError, toastApiError } from "@/lib/api-client";
 import {
   deleteHotel,
@@ -59,8 +61,6 @@ export default function HotelDashboardPage({
   const { id } = use(params);
   const hotelId = Number(id);
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const activeTab = searchParams.get("tab") === "rooms" ? "rooms" : "room-types";
 
   const [hotel, setHotel] = useState<Hotel | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,6 +74,7 @@ export default function HotelDashboardPage({
   );
   const [availabilityError, setAvailabilityError] = useState("");
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [availabilityTick, setAvailabilityTick] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -129,28 +130,26 @@ export default function HotelDashboardPage({
     return () => {
       cancelled = true;
     };
-  }, [hotelId, from, to]);
+  }, [hotelId, from, to, availabilityTick]);
+
+  const handleChanged = useCallback(() => {
+    void load();
+    setAvailabilityTick((t) => t + 1);
+  }, [load]);
 
   const availabilityByTypeId = useMemo(() => {
     if (!availability) return null;
-    const map = new Map<number, { total: number; booked: number; free: number }>();
+    const map = new Map<number, RoomTypeAvailability>();
     for (const rt of availability.room_types) {
       map.set(rt.room_type_id, {
         total: rt.total,
         booked: rt.booked,
         free: rt.free,
+        rooms: rt.rooms,
       });
     }
     return map;
   }, [availability]);
-
-  const setTab = (next: string) => {
-    const nextParams = new URLSearchParams(searchParams.toString());
-    nextParams.set("tab", next);
-    router.replace(`/admin/hotels/${hotelId}?${nextParams.toString()}`, {
-      scroll: false,
-    });
-  };
 
   const handleDelete = async () => {
     if (!hotel) return;
@@ -196,10 +195,9 @@ export default function HotelDashboardPage({
 
   const roomTypes = hotel.room_types ?? [];
   const totalRoomTypes = roomTypes.length;
-  const totalRooms = availability?.totals.total ?? roomTypes.reduce(
-    (sum, rt) => sum + (rt.rooms_count ?? 0),
-    0,
-  );
+  const totalRooms =
+    availability?.totals.total ??
+    roomTypes.reduce((sum, rt) => sum + (rt.rooms_count ?? 0), 0);
   const freeRooms = availability?.totals.free;
   const bookedRooms = availability?.totals.booked;
 
@@ -276,24 +274,11 @@ export default function HotelDashboardPage({
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="room-types">Room Types</TabsTrigger>
-          <TabsTrigger value="rooms">Rooms</TabsTrigger>
-        </TabsList>
-        <TabsContent value="room-types">
-          <RoomTypesTab
-            hotel={hotel}
-            availabilityByTypeId={availabilityByTypeId}
-            onChanged={load}
-          />
-        </TabsContent>
-        <TabsContent value="rooms">
-          <p className="py-12 text-center text-sm text-muted-foreground">
-            Rooms management arrives in a later ticket.
-          </p>
-        </TabsContent>
-      </Tabs>
+      <RoomTypesSection
+        hotel={hotel}
+        availabilityByTypeId={availabilityByTypeId}
+        onChanged={handleChanged}
+      />
 
       <ConfirmDialog
         open={showDeleteConfirm}

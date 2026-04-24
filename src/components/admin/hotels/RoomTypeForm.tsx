@@ -63,7 +63,10 @@ function arraysEqual(a: string[], b: string[]): boolean {
 
 export function RoomTypeForm({ hotelId, mode }: RoomTypeFormProps) {
   const router = useRouter();
-  const snapshot = useMemo(() => buildInitialState(mode.initial), [mode.initial]);
+  const snapshot = useMemo(
+    () => buildInitialState(mode.initial),
+    [mode.initial],
+  );
 
   const [form, setForm] = useState<FormState>(snapshot);
   const [submitting, setSubmitting] = useState(false);
@@ -159,9 +162,7 @@ export function RoomTypeForm({ hotelId, mode }: RoomTypeFormProps) {
       isSubmitting={submitting}
       formError={formError}
       onSubmit={onSubmit}
-      onCancel={() =>
-        router.push(`/admin/hotels/${hotelId}?tab=room-types`)
-      }
+      onCancel={() => router.push(`/admin/hotels/${hotelId}?tab=room-types`)}
     >
       <FormField label="Name" name="name" errors={fieldErrors} required>
         <Input
