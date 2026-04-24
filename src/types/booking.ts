@@ -152,6 +152,33 @@ export type ParkActivitySchedule = {
   updated_at: string;
 };
 
+// Minimal reservation shape returned when eager-loaded on booking resources.
+// Full reservation documentation lives in API_INTEGRATION.md §10 and will be
+// extended as the customer booking flow consumes more fields.
+export type ReservationSummary = {
+  id: number;
+  user_id?: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ParkActivityBookingStatus = "confirmed" | "cancelled";
+
+export type ParkActivityBooking = {
+  id: number;
+  reservation_id: number;
+  park_activity_schedule_id: number;
+  guests: number;
+  status: ParkActivityBookingStatus;
+  price_per_guest: string;
+  total_price: string;
+  cancelled_at: string | null;
+  reservation?: ReservationSummary;
+  schedule?: ParkActivitySchedule;
+  created_at: string;
+  updated_at: string;
+};
+
 export type EffectiveHour = {
   date: string;
   status: "open" | "closed";
