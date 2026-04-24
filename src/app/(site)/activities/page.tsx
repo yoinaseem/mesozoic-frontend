@@ -1,34 +1,29 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BeachActivityCard } from "@/components/beach-activities/BeachActivityCard";
-import { fetchBeachActivities } from "@/lib/api/server/beach-activities";
+import { ParkActivityCard } from "@/components/park-activities/ParkActivityCard";
+import { fetchParkActivities } from "@/lib/api/server/park-activities";
 
 export const metadata: Metadata = {
-  title: "Beach Activities | Mesozoic Isle",
+  title: "The Kingdom | Mesozoic Isle",
   description:
-    "Browse guided beach adventures at Mesozoic Isle — snorkelling, water sports, and coastal explorations.",
+    "Discover thrilling park activities at Mesozoic Isle — guided expeditions, encounters, and prehistoric wonders.",
 };
 
 export const revalidate = 300;
 
-export default async function BeachActivitiesPage() {
-  const activities = await fetchBeachActivities();
+export default async function ActivitiesPage() {
+  const activities = await fetchParkActivities();
 
   return (
     <div className="bg-base min-h-screen pt-[72px]">
       <section className="pt-16 pb-4 bg-linear-to-b from-primary/10 to-transparent">
         <div className="max-w-7xl mx-auto px-6">
-          <header className="mb-8">
-            <h1 className="text-5xl font-bold text-primary mb-4">
-              Island Beach Adventures
-            </h1>
-            <p className="text-muted text-lg">
-              Experience the thrill of the ocean with our carefully curated
-              selection of beach activities. From adrenaline-pumping water
-              sports to serene coastal explorations, discover unforgettable
-              moments on the island&apos;s pristine beaches. Each activity is
-              guided by experienced professionals to ensure your safety and
-              maximum enjoyment.
+          <header>
+            <h1 className="text-5xl font-bold text-primary">The Kingdom</h1>
+            <p className="text-muted mt-4 text-lg max-w-2xl">
+              Step into a world unlike any other. Discover thrilling park
+              attractions, guided expeditions, and prehistoric wonders hidden
+              deep within Mesozoic Isle.
             </p>
           </header>
         </div>
@@ -40,7 +35,7 @@ export default async function BeachActivitiesPage() {
             <div className="flex justify-center items-center min-h-96">
               <div className="text-center">
                 <p className="text-muted">
-                  No beach activities available at the moment.
+                  No park activities available at the moment.
                 </p>
               </div>
             </div>
@@ -48,17 +43,16 @@ export default async function BeachActivitiesPage() {
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {activities.map((activity) => (
-                  <BeachActivityCard key={activity.id} activity={activity} />
+                  <ParkActivityCard key={activity.id} activity={activity} />
                 ))}
               </div>
 
               <div className="mt-16 text-center">
                 <h2 className="text-2xl font-bold text-primary mb-4">
-                  Ready for an adventure?
+                  Ready to explore The Kingdom?
                 </h2>
                 <p className="text-muted mb-8 max-w-xl mx-auto">
-                  Book your beach activity and make unforgettable memories on
-                  the island.
+                  Book your park activity and experience the wonders of Mesozoic Isle up close.
                 </p>
                 <Link href="/book">
                   <button className="btn-accent px-8 py-3 text-lg">
