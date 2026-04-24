@@ -6,6 +6,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { Toaster } from "@/components/ui/sonner";
 import { ModeToggle } from "@/components/mode-toggle";
 import { MANAGEMENT_ROLES } from "@/config/roles";
 
@@ -37,6 +38,7 @@ export default function AdminShellLayout({
           </header>
           <div className="flex flex-1 flex-col gap-4 p-4 pt-0">{children}</div>
         </SidebarInset>
+        <Toaster />
       </SidebarProvider>
     </ProtectedRoute>
   );

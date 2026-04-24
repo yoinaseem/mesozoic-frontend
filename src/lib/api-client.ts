@@ -1,4 +1,6 @@
-﻿import { FieldErrors } from "@/types/auth";
+﻿import { toast } from "sonner";
+
+import { FieldErrors } from "@/types/auth";
 
 type ApiClientConfig = {
   getToken: () => string | null;
@@ -54,6 +56,35 @@ export function getValidationErrors(error: unknown): FieldErrors {
 
   const data = error.data as LaravelErrorResponse;
   return data?.errors ?? {};
+}
+
+// Surfaces a non-crashing toast for API failures. Forms still call
+// `getValidationErrors` directly for 422 field-level errors; this helper
+// handles everything else. Safe to call from client components only.
+export function toastApiError(error: unknown): void {
+  if (error instanceof ApiError) {
+    switch (error.status) {
+      case 401:
+      case 422:
+        return; // 401 redirects globally; 422 renders inline on the form
+      case 403:
+        toast.error("You don't have access to that action.");
+        return;
+      case 429:
+        toast.error("Too many requests — try again in a minute.");
+        return;
+      default:
+        toast.error(error.message || "Something went wrong.");
+        return;
+    }
+  }
+
+  if (error instanceof Error && error.message) {
+    toast.error(error.message);
+    return;
+  }
+
+  toast.error("Something went wrong.");
 }
 
 export async function apiRequest<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {

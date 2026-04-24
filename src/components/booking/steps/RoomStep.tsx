@@ -203,7 +203,7 @@ export function RoomStep() {
                   aria-pressed={active}
                 >
                   <p className="font-semibold text-primary">{hotel.name}</p>
-                  <p className="text-muted mt-1 text-sm">{hotel.address}</p>
+                  <p className="text-muted mt-1 text-sm">{hotel.address ?? "—"}</p>
                 </button>
               );
             })}

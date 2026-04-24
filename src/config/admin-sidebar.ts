@@ -30,11 +30,6 @@ export const adminNavItems: AdminNavItem[] = [
     url: "/admin/hotels",
     icon: Hotel,
     permission: "hotels.view",
-    items: [
-      { title: "Hotels", url: "/admin/hotels" },
-      { title: "Room Types", url: "/admin/room-types" },
-      { title: "Rooms", url: "/admin/rooms" },
-    ],
   },
   {
     title: "Ferries",
