@@ -35,8 +35,11 @@ export class ApiError extends Error {
   constructor(status: number, data: unknown) {
     const fallbackMessage = status >= 500 ? "Server error" : "Request failed";
     const message =
-      typeof data === "object" && data !== null && "message" in data && typeof (data as LaravelErrorResponse).message === "string"
-        ? (data as LaravelErrorResponse).message ?? fallbackMessage
+      typeof data === "object" &&
+      data !== null &&
+      "message" in data &&
+      typeof (data as LaravelErrorResponse).message === "string"
+        ? ((data as LaravelErrorResponse).message ?? fallbackMessage)
         : fallbackMessage;
 
     super(message);
@@ -61,22 +64,19 @@ export function getValidationErrors(error: unknown): FieldErrors {
 // Surfaces a non-crashing toast for API failures. Forms still call
 // `getValidationErrors` directly for 422 field-level errors; this helper
 // handles everything else. Safe to call from client components only.
+//
+// Copy precedence: backend message first (err.message from ApiError), then
+// a status-specific fallback, then a generic catch-all. Lets the backend
+// override any message with a more specific one when relevant.
 export function toastApiError(error: unknown): void {
   if (error instanceof ApiError) {
-    switch (error.status) {
-      case 401:
-      case 422:
-        return; // 401 redirects globally; 422 renders inline on the form
-      case 403:
-        toast.error("You don't have access to that action.");
-        return;
-      case 429:
-        toast.error("Too many requests — try again in a minute.");
-        return;
-      default:
-        toast.error(error.message || "Something went wrong.");
-        return;
+    if (error.status === 401 || error.status === 422) {
+      return; // 401 redirects globally; 422 renders inline on the form
     }
+    const backendMessage = hasOwnMessage(error) ? error.message : "";
+    const fallback = fallbackForStatus(error.status);
+    toast.error(backendMessage || fallback);
+    return;
   }
 
   if (error instanceof Error && error.message) {
@@ -87,7 +87,32 @@ export function toastApiError(error: unknown): void {
   toast.error("Something went wrong.");
 }
 
-export async function apiRequest<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
+// ApiError sets `message` from the Laravel payload; when the backend doesn't
+// return one we fall through to a canned default like "Request failed". We
+// only want to prefer `error.message` when it came from the backend, not the
+// constructor's default — checking the data envelope distinguishes the two.
+function hasOwnMessage(error: ApiError): boolean {
+  const data = error.data as LaravelErrorResponse | null;
+  return typeof data?.message === "string" && data.message.trim().length > 0;
+}
+
+function fallbackForStatus(status: number): string {
+  switch (status) {
+    case 403:
+      return "You don't have access to that action.";
+    case 429:
+      return "Too many requests — try again in a minute.";
+    default:
+      return status >= 500
+        ? "Something went wrong on the server."
+        : "Something went wrong.";
+  }
+}
+
+export async function apiRequest<T>(
+  path: string,
+  options: ApiRequestOptions = {},
+): Promise<T> {
   const urlPath = path.startsWith("/") ? path : `/${path}`;
   const url = `${API_BASE_URL}${urlPath}`;
 
@@ -112,7 +137,9 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
   });
 
   const contentType = response.headers.get("content-type") ?? "";
-  const responseData = contentType.includes("application/json") ? await response.json() : null;
+  const responseData = contentType.includes("application/json")
+    ? await response.json()
+    : null;
 
   if (!response.ok) {
     if (response.status === 401) {
