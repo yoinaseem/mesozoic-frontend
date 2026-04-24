@@ -1,16 +1,12 @@
-"use client";
-
-export default function Error({ reset }: { error: Error; reset: () => void }) {
+export default function Loading() {
   return (
     <div className="bg-base min-h-screen pt-[72px]">
       <section className="pt-16 pb-16">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex justify-center items-center min-h-96">
             <div className="text-center">
-              <p className="text-red-500 mb-6">Failed to load hotels.</p>
-              <button onClick={reset} className="btn-accent px-6 py-2">
-                Try again
-              </button>
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted">Loading hotel details...</p>
             </div>
           </div>
         </div>
