@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { useBookingCart } from "@/context/booking-cart-context";
 import { getEffectiveHours, listThemeParks } from "@/lib/api/theme-parks";
@@ -36,12 +37,16 @@ export function ThemeParkStep() {
   );
 
   const [hours, setHours] = useState<EffectiveHour | null>(null);
-  const [loadingHours, setLoadingHours] = useState(false);
+  const [hoursLoadedFor, setHoursLoadedFor] = useState<string | null>(null);
+  const hoursKey =
+    selectedParkId !== null && visitDate
+      ? `${selectedParkId}|${visitDate}`
+      : null;
+  const loadingHours = hoursKey !== null && hoursLoadedFor !== hoursKey;
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    setLoadingParks(true);
     listThemeParks()
       .then((res) => {
         if (cancelled) return;
@@ -58,23 +63,20 @@ export function ThemeParkStep() {
   }, []);
 
   useEffect(() => {
-    if (selectedParkId === null || !visitDate) {
-      setHours(null);
-      return;
-    }
+    if (selectedParkId === null || !visitDate) return;
     let cancelled = false;
-    setLoadingHours(true);
+    const key = `${selectedParkId}|${visitDate}`;
     getEffectiveHours(selectedParkId, { date: visitDate })
       .then((res) => {
         if (cancelled) return;
         const list = Array.isArray(res) ? res : res.data;
         setHours(list[0] ?? null);
-        setLoadingHours(false);
+        setHoursLoadedFor(key);
       })
       .catch(() => {
         if (cancelled) return;
         setHours(null);
-        setLoadingHours(false);
+        setHoursLoadedFor(key);
       });
     return () => {
       cancelled = true;
@@ -164,13 +166,13 @@ export function ThemeParkStep() {
           >
             Visit date
           </label>
-          <Input
+          <DatePicker
             id="park-date"
-            type="date"
-            min={todayIso()}
             className="mt-2"
+            min={todayIso()}
             value={visitDate}
-            onChange={(e) => setVisitDate(e.target.value)}
+            onChange={setVisitDate}
+            placeholder="Select visit date"
           />
         </div>
         <div>

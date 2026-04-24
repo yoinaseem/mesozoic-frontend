@@ -20,6 +20,7 @@ const navLinks = [
   { href: "/activities", label: "The Kingdom" },
   { href: "/beach-activities", label: "Island Experiences" },
   { href: "/accommodation", label: "Accommodation" },
+  { href: "/about", label: "About Us" },
 ] as const;
 
 /** Approximate fixed bar height (py-4 + text line); used with hero-card-sentinel rect */
@@ -75,6 +76,9 @@ export default function Navbar() {
   const linkClass = transparentOnHero
     ? `${linkBase} text-white!  font-normal drop-shadow-md`
     : `${linkBase} text-primary font-bold`;
+  const toggleClass = transparentOnHero
+    ? "text-white! drop-shadow-md hover:bg-white/10"
+    : "text-primary hover:bg-base/70";
 
   return (
     <header
@@ -109,9 +113,7 @@ export default function Navbar() {
         </nav>
 
         <div className="flex items-center gap-4">
-          <ModeToggle
-            className={transparentOnHero ? "text-white! drop-shadow-md" : ""}
-          />
+          <ModeToggle className={toggleClass} />
 
           {loading ? (
             <div aria-hidden className="size-8" />
