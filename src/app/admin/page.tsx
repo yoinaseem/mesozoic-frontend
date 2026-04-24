@@ -23,7 +23,11 @@ export default function AdminLandingPage() {
 
   return (
     <div className="bg-base flex min-h-dvh items-center justify-center">
-      <div role="status" aria-live="polite" className="flex items-center justify-center">
+      <div
+        role="status"
+        aria-live="polite"
+        className="flex items-center justify-center"
+      >
         <span className="sr-only">Redirecting</span>
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-(--color-border) border-t-(--color-primary)" />
       </div>
