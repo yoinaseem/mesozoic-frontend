@@ -7,6 +7,8 @@ import type {
   ThemePark,
 } from "@/types/booking";
 
+type DataEnvelope<T> = { data: T };
+
 export async function listThemeParks() {
   return apiRequest<{ data: ThemePark[] }>("/theme-parks", { skipAuth: true });
 }
@@ -17,9 +19,40 @@ export async function getThemePark(parkId: number) {
   });
 }
 
-export async function listParkActivities(parkId: number) {
-  return apiRequest<{ data: ParkActivity[] }>(
-    `/theme-parks/${parkId}/activities`,
+export type ThemeParkInput = {
+  name: string;
+  description: string;
+  capacity: number;
+  price: number;
+  contact_email: string;
+  contact_phone: string;
+  images?: string[] | null;
+};
+
+export async function createThemePark(input: ThemeParkInput) {
+  return apiRequest<DataEnvelope<ThemePark>>(`/theme-parks`, {
+    method: "POST",
+    body: input,
+  });
+}
+
+export async function updateThemePark(
+  parkId: number,
+  input: Partial<ThemeParkInput>,
+) {
+  return apiRequest<DataEnvelope<ThemePark>>(`/theme-parks/${parkId}`, {
+    method: "PATCH",
+    body: input,
+  });
+}
+
+export async function deleteThemePark(parkId: number) {
+  return apiRequest<null>(`/theme-parks/${parkId}`, { method: "DELETE" });
+}
+
+export async function listParkActivities(parkId: number, page = 1) {
+  return apiRequest<Paginated<ParkActivity>>(
+    `/theme-parks/${parkId}/activities?page=${page}`,
     { skipAuth: true },
   );
 }
