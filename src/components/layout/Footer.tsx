@@ -57,15 +57,26 @@ const socialLinks = [
 export default function Footer() {
   return (
     <footer className="shrink-0 bg-surface border-t border-base mt-auto">
-      <div className="max-w-7xl mx-auto px-6 py-16">
+      <div className="max-w-7xl mx-auto px-6 py-10 md:py-16">
         <div className="grid grid-cols-1 gap-10 md:grid-cols-2 md:gap-8">
-          <div className="flex flex-col gap-2">
-            <p className="text-base font-semibold text-primary">Mesozoic Isle</p>
+          <div className="flex flex-col gap-2 items-center text-center">
+            <span className="inline-flex flex-col leading-none text-primary">
+              <span className="font-heading text-[1.45rem] tracking-[0.32em] font-semibold lg:text-[1.6rem]">
+                MESOZOIC
+              </span>
+              <span className="mt-1 inline-flex items-center justify-center gap-2">
+                <span className="h-px w-9 bg-current opacity-90 lg:w-10" aria-hidden />
+                <span className="text-center font-heading text-[0.82rem] tracking-[0.24em] font-semibold lg:text-[0.9rem]">
+                  ISLE
+                </span>
+                <span className="h-px w-9 bg-current opacity-90 lg:w-10" aria-hidden />
+              </span>
+            </span>
             <p className="text-muted text-sm max-w-md">
               Prehistoric adventures on our dinosaur-themed island.
             </p>
             <nav
-              className="mt-4 flex flex-row flex-wrap items-center gap-4"
+              className="mt-4 flex flex-row flex-wrap items-center justify-center gap-4"
               aria-label="Social media"
             >
               {socialLinks.map(({ href, label, icon }) => (
@@ -82,9 +93,11 @@ export default function Footer() {
           </div>
 
           <div>
-            <p className="text-sm font-semibold text-primary mb-4">Quick links</p>
+            <p className="text-sm font-semibold text-primary mb-4 text-center md:text-left">
+              Quick links
+            </p>
             <nav aria-label="Footer quick links">
-              <ul className="flex flex-col gap-3">
+              <ul className="grid grid-cols-2 gap-x-8 gap-y-3 justify-center w-fit mx-auto md:mx-0 md:w-auto md:flex md:flex-col">
                 {quickLinks.map(({ href, label }) => (
                   <li key={label}>
                     {href.startsWith("/") ? (
@@ -103,8 +116,8 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-base mt-10 pt-8">
-          <p className="text-muted text-sm">
+        <div className="border-t border-base mt-10 pt-6 md:pt-8">
+          <p className="text-muted text-sm text-center md:text-left">
             © {new Date().getFullYear()} Mesozoic Isle. All rights reserved.
           </p>
         </div>
