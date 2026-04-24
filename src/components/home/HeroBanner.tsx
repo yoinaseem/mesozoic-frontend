@@ -33,34 +33,34 @@ export default function HeroBanner() {
         priority
       />
       <div
-        className="pointer-events-none absolute inset-0 z-1 bg-gradient-to-r from-black/70 via-black/50 to-black/20"
+        className="pointer-events-none absolute inset-0 z-1 bg-black/45"
         aria-hidden
       />
 
       <div
-        className={`relative z-10 flex w-full items-center px-6 sm:px-10 lg:px-16 py-24 ${heroMinHeight}`}
+        className={`relative z-10 flex w-full items-center justify-center px-6 py-24 ${heroMinHeight}`}
       >
-        <div className="max-w-7xl w-full mx-auto">
+        <div className="mx-auto w-full max-w-7xl">
           <div
             id="hero-card-sentinel"
             className="pointer-events-none h-0 w-full"
             aria-hidden
           />
-          <div className="max-w-2xl">
-            <p className="text-xs sm:text-sm uppercase tracking-[0.35em] font-heading font-semibold text-primary drop-shadow-md">
-              Welcome to
-            </p>
-
-            <h1 className="mt-3 font-heading font-bold leading-[0.95] drop-shadow-xl">
-              <span className="block text-6xl sm:text-7xl lg:text-8xl text-primary">
+          <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
+            <h1 className="inline-flex flex-col leading-none text-primary drop-shadow-md">
+              <span className="font-heading text-4xl font-semibold tracking-[0.32em] sm:text-5xl">
                 MESOZOIC
               </span>
-              <span className="block text-6xl sm:text-7xl lg:text-8xl text-accent">
-                ISLE
+              <span className="mt-2 inline-flex items-center justify-center gap-3">
+                <span className="h-px w-10 bg-current opacity-90 sm:w-12" aria-hidden />
+                <span className="font-heading text-xl font-semibold tracking-[0.26em] sm:text-2xl">
+                  ISLE
+                </span>
+                <span className="h-px w-10 bg-current opacity-90 sm:w-12" aria-hidden />
               </span>
             </h1>
 
-            <p className="mt-6 max-w-lg text-base sm:text-lg text-white/85 drop-shadow-md">
+            <p className="mt-6 max-w-lg text-base text-white/90 drop-shadow-md sm:text-lg">
               Experience prehistoric adventures on our dinosaur-themed island.
             </p>
 

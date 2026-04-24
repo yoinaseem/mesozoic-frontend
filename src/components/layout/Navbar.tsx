@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -90,6 +91,12 @@ export default function Navbar() {
   const toggleClass = transparentOnHero
     ? "text-white! drop-shadow-md hover:bg-white/10"
     : "text-primary hover:bg-base/70";
+  const logoIconSrc = transparentOnHero
+    ? "/img/nav-logo-dark.png"
+    : "/img/nav-logo-light.png";
+  const brandTextClass = transparentOnHero
+    ? "text-white! drop-shadow-md"
+    : "text-primary";
 
   return (
     <header
@@ -105,12 +112,33 @@ export default function Navbar() {
             href="/"
             className={
               transparentOnHero
-                ? "inline-block border-b-2 border-b-transparent pb-0.5 text-xl lg:text-2xl font-heading tracking-widest font-bold text-white! drop-shadow-md transition-[border-bottom-color,opacity] hover:border-b-white hover:opacity-100!"
-                : "inline-block border-b-2 border-b-transparent pb-0.5 text-xl lg:text-2xl font-heading tracking-widest font-bold text-primary transition-[border-bottom-color,opacity] hover:border-b-current hover:opacity-100!"
+                ? "inline-flex items-center gap-2 drop-shadow-md transition-opacity hover:opacity-100!"
+                : "inline-flex items-center gap-2 transition-opacity hover:opacity-100!"
             }
             aria-label="Mesozoic Isle home"
           >
-            Mesozoic Isle
+            <Image
+              src={logoIconSrc}
+              alt=""
+              width={128}
+              height={128}
+              priority
+              className={`h-11 w-11 object-contain lg:h-12 lg:w-12 ${
+                transparentOnHero ? "mix-blend-screen" : ""
+              }`}
+            />
+            <span className={`inline-flex flex-col leading-none ${brandTextClass}`}>
+              <span className="font-heading text-[1.45rem] tracking-[0.32em] font-semibold lg:text-[1.6rem]">
+                MESOZOIC
+              </span>
+              <span className="mt-1 inline-flex items-center justify-center gap-2">
+                <span className="h-px w-9 bg-current opacity-90 lg:w-10" aria-hidden />
+                <span className="text-center font-heading text-[0.82rem] tracking-[0.24em] font-semibold lg:text-[0.9rem]">
+                  ISLE
+                </span>
+                <span className="h-px w-9 bg-current opacity-90 lg:w-10" aria-hidden />
+              </span>
+            </span>
           </Link>
 
           <nav

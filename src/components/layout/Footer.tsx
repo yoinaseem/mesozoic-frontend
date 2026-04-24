@@ -60,7 +60,18 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-6 py-10 md:py-16">
         <div className="grid grid-cols-1 gap-10 md:grid-cols-2 md:gap-8">
           <div className="flex flex-col gap-2 items-center text-center">
-            <p className="text-base font-semibold text-primary">Mesozoic Isle</p>
+            <span className="inline-flex flex-col leading-none text-primary">
+              <span className="font-heading text-[1.45rem] tracking-[0.32em] font-semibold lg:text-[1.6rem]">
+                MESOZOIC
+              </span>
+              <span className="mt-1 inline-flex items-center justify-center gap-2">
+                <span className="h-px w-9 bg-current opacity-90 lg:w-10" aria-hidden />
+                <span className="text-center font-heading text-[0.82rem] tracking-[0.24em] font-semibold lg:text-[0.9rem]">
+                  ISLE
+                </span>
+                <span className="h-px w-9 bg-current opacity-90 lg:w-10" aria-hidden />
+              </span>
+            </span>
             <p className="text-muted text-sm max-w-md">
               Prehistoric adventures on our dinosaur-themed island.
             </p>
