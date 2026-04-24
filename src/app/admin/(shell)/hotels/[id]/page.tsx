@@ -244,7 +244,7 @@ export default function HotelDashboardPage({
                 value={from}
                 onChange={setFrom}
                 max={to ? addDaysIso(to, -1) : undefined}
-                className="w-full sm:w-[11rem]"
+                className="w-full sm:w-44"
               />
             </div>
             <div className="space-y-1">
@@ -259,7 +259,7 @@ export default function HotelDashboardPage({
                 value={to}
                 onChange={setTo}
                 min={from ? addDaysIso(from, 1) : undefined}
-                className="w-full sm:w-[11rem]"
+                className="w-full sm:w-44"
               />
             </div>
           </div>
