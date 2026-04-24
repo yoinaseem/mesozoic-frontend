@@ -1,12 +1,14 @@
 "use client";
 
-import { ApiError, getValidationErrors } from "@/lib/api-client";
-import { createUser } from "@/lib/api/users";
-import type { FieldErrors } from "@/types/auth";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { useState, type FormEvent } from "react";
+import { toast } from "sonner";
+
+import { FormField } from "@/components/admin/FormField";
+import { FormPage } from "@/components/admin/FormPage";
+import { useFieldErrors } from "@/components/admin/useFieldErrors";
+import { Input } from "@/components/ui/input";
+import { createUser } from "@/lib/api/users";
 
 export function CreateAdminUserForm() {
   const router = useRouter();
@@ -15,16 +17,20 @@ export function CreateAdminUserForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [formError, setFormError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const { formError, fieldErrors, setFieldErrors, reset, setFromApiError } =
+    useFieldErrors();
+
+  const isDirty =
+    name.length > 0 ||
+    email.length > 0 ||
+    password.length > 0 ||
+    passwordConfirmation.length > 0;
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setFieldErrors({});
-    setFormError("");
-    setSuccessMessage("");
+    reset();
 
     if (password !== passwordConfirmation) {
       setFieldErrors({
@@ -43,147 +49,95 @@ export function CreateAdminUserForm() {
         password_confirmation: passwordConfirmation,
       });
 
-      setSuccessMessage(
-        `Created ${created.name}. Assign their role from the users list — new accounts start with no role.`,
-      );
+      toast.success(`Created ${created.name}.`);
       setName("");
       setEmail("");
       setPassword("");
       setPasswordConfirmation("");
+      reset();
       router.refresh();
     } catch (error) {
-      if (error instanceof ApiError && error.status === 422) {
-        setFieldErrors(getValidationErrors(error));
-        return;
-      }
-
-      if (error instanceof ApiError && error.status === 403) {
-        setFormError("Only a superadmin can create users.");
-        return;
-      }
-
-      if (error instanceof Error && error.message.trim()) {
-        setFormError(error.message);
-        return;
-      }
-
-      setFormError("Unable to create the user right now. Please try again.");
+      setFromApiError(error);
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <form className="mt-8 space-y-4" onSubmit={onSubmit}>
-      <div>
-        <label htmlFor="admin-user-name" className="block text-sm font-medium">
-          Full name
-        </label>
+    <FormPage
+      title="Create admin user"
+      description="Create a staff account. Role assignment happens separately once the backend exposes it."
+      submitLabel={submitting ? "Creating user..." : "Create user"}
+      isDirty={isDirty}
+      isSubmitting={submitting}
+      formError={formError}
+      onSubmit={onSubmit}
+      onCancel={() => router.back()}
+    >
+      <FormField
+        label="Full name"
+        name="name"
+        errors={fieldErrors}
+        required
+      >
         <Input
-          id="admin-user-name"
-          name="name"
           type="text"
           autoComplete="name"
           required
           placeholder="Ada Lovelace"
-          aria-invalid={fieldErrors.name?.length ? true : undefined}
-          className="mt-1"
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
-        {fieldErrors.name?.map((error) => (
-          <p className="mt-1 text-sm text-destructive" key={error}>
-            {error}
-          </p>
-        ))}
-      </div>
+      </FormField>
 
-      <div>
-        <label htmlFor="admin-user-email" className="block text-sm font-medium">
-          Work email
-        </label>
+      <FormField
+        label="Work email"
+        name="email"
+        errors={fieldErrors}
+        required
+      >
         <Input
-          id="admin-user-email"
-          name="email"
           type="email"
           autoComplete="email"
           required
           placeholder="ada@mesozoicisle.com"
-          aria-invalid={fieldErrors.email?.length ? true : undefined}
-          className="mt-1"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
         />
-        {fieldErrors.email?.map((error) => (
-          <p className="mt-1 text-sm text-destructive" key={error}>
-            {error}
-          </p>
-        ))}
-      </div>
+      </FormField>
 
-      <div>
-        <label htmlFor="admin-user-password" className="block text-sm font-medium">
-          Temporary password
-        </label>
+      <FormField
+        label="Temporary password"
+        name="password"
+        errors={fieldErrors}
+        required
+        helper="At least 8 characters. The user can change it after first login."
+      >
         <Input
-          id="admin-user-password"
-          name="password"
           type="password"
           autoComplete="new-password"
           required
           minLength={8}
-          aria-invalid={fieldErrors.password?.length ? true : undefined}
-          className="mt-1"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
         />
-        {fieldErrors.password?.map((error) => (
-          <p className="mt-1 text-sm text-destructive" key={error}>
-            {error}
-          </p>
-        ))}
-        <p className="mt-1 text-xs text-muted-foreground">
-          At least 8 characters. The user can change it after first login.
-        </p>
-      </div>
+      </FormField>
 
-      <div>
-        <label
-          htmlFor="admin-user-password-confirm"
-          className="block text-sm font-medium"
-        >
-          Confirm password
-        </label>
+      <FormField
+        label="Confirm password"
+        name="password_confirmation"
+        errors={fieldErrors}
+        required
+      >
         <Input
-          id="admin-user-password-confirm"
-          name="password_confirmation"
           type="password"
           autoComplete="new-password"
           required
           minLength={8}
-          aria-invalid={fieldErrors.password_confirmation?.length ? true : undefined}
-          className="mt-1"
           value={passwordConfirmation}
           onChange={(event) => setPasswordConfirmation(event.target.value)}
         />
-        {fieldErrors.password_confirmation?.map((error) => (
-          <p className="mt-1 text-sm text-destructive" key={error}>
-            {error}
-          </p>
-        ))}
-      </div>
-
-      {formError ? (
-        <p className="text-sm text-destructive">{formError}</p>
-      ) : null}
-
-      {successMessage ? (
-        <p className="text-sm text-primary">{successMessage}</p>
-      ) : null}
-
-      <Button type="submit" disabled={submitting} className="mt-2 w-full">
-        {submitting ? "Creating user..." : "Create user"}
-      </Button>
-    </form>
+      </FormField>
+    </FormPage>
   );
 }
