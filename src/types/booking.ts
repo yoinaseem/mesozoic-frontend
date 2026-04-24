@@ -21,7 +21,7 @@ export type Room = {
   hotel_id: number;
   room_type_id: number;
   room_no: string;
-  room_type: RoomType;
+  room_type?: RoomType;
   created_at: string;
   updated_at: string;
 };
@@ -29,8 +29,8 @@ export type Room = {
 export type Hotel = {
   id: number;
   name: string;
-  address: string;
-  description: string;
+  address: string | null;
+  description: string | null;
   amenities: string[] | null;
   image: string | null;
   room_types?: RoomType[];
