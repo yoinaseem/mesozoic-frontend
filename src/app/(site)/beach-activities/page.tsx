@@ -1,36 +1,21 @@
-"use client";
-
-import React, { useState, useEffect } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { BeachActivityCard } from "@/components/beach-activities/BeachActivityCard";
-import { listBeachActivities } from "@/lib/api/beach-activities";
-import type { BeachActivity } from "@/types/booking";
+import { fetchBeachActivities } from "@/lib/api/server/beach-activities";
 
-export default function BeachActivitiesPage() {
-  const [activities, setActivities] = useState<BeachActivity[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export const metadata: Metadata = {
+  title: "Beach Activities | Mesozoic Isle",
+  description:
+    "Browse guided beach adventures at Mesozoic Isle — snorkelling, water sports, and coastal explorations.",
+};
 
-  useEffect(() => {
-    const fetchActivities = async () => {
-      try {
-        setLoading(true);
-        const res = await listBeachActivities();
-        setActivities(res.data);
-      } catch (err) {
-        setError("Failed to load beach activities");
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
+export const revalidate = 300;
 
-    fetchActivities();
-  }, []);
+export default async function BeachActivitiesPage() {
+  const activities = await fetchBeachActivities();
 
   return (
     <div className="bg-base min-h-screen pt-[72px]">
-      {/* Hero Section */}
       <section className="pt-16 pb-4 bg-linear-to-b from-primary/10 to-transparent">
         <div className="max-w-7xl mx-auto px-6">
           <header className="mb-8">
@@ -49,23 +34,9 @@ export default function BeachActivitiesPage() {
         </div>
       </section>
 
-      {/* Activities Section */}
       <section className="pt-4 pb-16">
         <div className="max-w-7xl mx-auto px-6">
-          {loading ? (
-            <div className="flex justify-center items-center min-h-96">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-muted">Loading activities...</p>
-              </div>
-            </div>
-          ) : error ? (
-            <div className="flex justify-center items-center min-h-96">
-              <div className="text-center">
-                <p className="text-red-500">{error}</p>
-              </div>
-            </div>
-          ) : activities.length === 0 ? (
+          {activities.length === 0 ? (
             <div className="flex justify-center items-center min-h-96">
               <div className="text-center">
                 <p className="text-muted">
@@ -81,7 +52,6 @@ export default function BeachActivitiesPage() {
                 ))}
               </div>
 
-              {/* CTA Section */}
               <div className="mt-16 text-center">
                 <h2 className="text-2xl font-bold text-primary mb-4">
                   Ready for an adventure?
