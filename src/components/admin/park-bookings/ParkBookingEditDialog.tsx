@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { asBlockingBookings } from "@/lib/api/park-cascade";
 import {
   updateParkBooking,
   type ParkBookingUpdateInput,
@@ -85,7 +86,17 @@ export function ParkBookingEditDialog({
       toast.success(`Updated booking #${booking.id}.`);
       onSuccess();
     } catch (error) {
-      setFromApiError(error);
+      // DESD-95: cancel/date-change is blocked when the same reservation has
+      // confirmed activity bookings on this day. Surface the count so the
+      // operator knows where to go next.
+      const blocking = asBlockingBookings(error);
+      if (blocking) {
+        toast.error(
+          `Cannot apply — ${blocking.blocking_bookings} activity booking(s) on this date depend on this day-pass. Cancel them first via Activity bookings.`,
+        );
+      } else {
+        setFromApiError(error);
+      }
     } finally {
       setSubmitting(false);
     }

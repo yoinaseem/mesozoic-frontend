@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ApiError, toastApiError } from "@/lib/api-client";
+import { asBlockingBookings } from "@/lib/api/park-cascade";
 import {
   cancelParkBooking,
   listParkBookings,
@@ -205,6 +206,15 @@ export default function ParkBookingsPage() {
       toast.success(`Cancelled booking #${pendingCancel.id}.`);
       await load();
     } catch (error) {
+      // DESD-95: cancel is blocked when activity bookings depend on the
+      // day-pass for that date.
+      const blocking = asBlockingBookings(error);
+      if (blocking) {
+        toast.error(
+          `Cannot cancel — ${blocking.blocking_bookings} activity booking(s) depend on this day-pass. Cancel them first via Activity bookings.`,
+        );
+        throw error;
+      }
       toastApiError(error);
       throw error;
     }
