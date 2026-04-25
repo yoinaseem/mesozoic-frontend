@@ -62,6 +62,7 @@ export const adminNavItems: AdminNavItem[] = [
     permission: "park.view",
     items: [
       { title: "Parks", url: "/admin/parks" },
+      { title: "Bookings", url: "/admin/park-bookings" },
       { title: "Activity bookings", url: "/admin/park-activity-bookings" },
     ],
   },

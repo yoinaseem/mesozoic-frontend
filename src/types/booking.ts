@@ -206,6 +206,45 @@ export type ParkActivityBooking = {
   updated_at: string;
 };
 
+export type ParkBookingStatus = "confirmed" | "cancelled";
+
+export type ParkBooking = {
+  id: number;
+  reservation_id: number;
+  park_id: number;
+  date: string;
+  guests: number;
+  status: ParkBookingStatus;
+  price_per_guest: string;
+  total_price: string;
+  cancelled_at: string | null;
+  reservation?: ReservationSummary;
+  park?: ThemePark;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ParkOpeningDay =
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday"
+  | "saturday"
+  | "sunday";
+
+export type ParkHourOverride = {
+  id: number;
+  park_id: number;
+  date: string;
+  open_time: string | null;
+  close_time: string | null;
+  is_closed: boolean;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type EffectiveHour = {
   date: string;
   status: "open" | "closed";
