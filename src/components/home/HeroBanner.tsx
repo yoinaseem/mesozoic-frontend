@@ -28,19 +28,19 @@ export default function HeroBanner() {
         src="/img/hero-home-dark.png"
         alt=""
         fill
-        className="z-0 object-cover"
+        className="z-0 scale-110 translate-x-[4%] object-cover"
         sizes="100vw"
         priority
       />
 
-      {/* Vertical gradient: darker at top (under nav) + bottom (under copy), lighter through the middle. */}
+      {/* Horizontal gradient: dark on the left for copy legibility, fading to transparent over the dinosaur on the right. */}
       <div
-        className="pointer-events-none absolute inset-0 z-1 bg-linear-to-b from-black/70 via-black/30 to-black/80 dark:from-black/45 dark:via-black/15 dark:to-black/50"
+        className="pointer-events-none absolute inset-0 z-1 bg-linear-to-r from-black/60 via-black/25 to-transparent"
         aria-hidden
       />
 
       <div
-        className={`relative z-10 flex w-full items-center justify-start px-6 py-24 ${heroMinHeight}`}
+        className={`relative z-10 flex w-full items-end justify-start px-6 pt-24 pb-28 sm:pb-32 ${heroMinHeight}`}
       >
         <div className="mx-auto w-full max-w-7xl">
           <div
@@ -48,7 +48,7 @@ export default function HeroBanner() {
             className="pointer-events-none h-0 w-full"
             aria-hidden
           />
-          <div className="flex max-w-3xl flex-col items-start text-left">
+          <div className="flex max-w-2xl flex-col items-start text-left">
             <div className="flex w-fit flex-col">
               <p className="font-heading text-left text-xs font-semibold uppercase tracking-[0.42em] text-accent drop-shadow-md sm:text-sm">
                 Welcome to a Lost World
