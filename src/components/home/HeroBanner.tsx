@@ -32,8 +32,10 @@ export default function HeroBanner() {
         sizes="100vw"
         priority
       />
+
+      {/* Vertical gradient: darker at top (under nav) + bottom (under copy), lighter through the middle. */}
       <div
-        className="pointer-events-none absolute inset-0 z-1 bg-black/45"
+        className="pointer-events-none absolute inset-0 z-1 bg-linear-to-b from-black/70 via-black/30 to-black/80 dark:from-black/45 dark:via-black/15 dark:to-black/50"
         aria-hidden
       />
 
@@ -47,34 +49,46 @@ export default function HeroBanner() {
             aria-hidden
           />
           <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
-            <h1 className="inline-flex flex-col leading-none text-primary drop-shadow-md">
-              <span className="font-heading text-4xl font-semibold tracking-[0.32em] sm:text-5xl">
+            <p className="font-heading text-xs font-semibold uppercase tracking-[0.42em] text-accent drop-shadow-md sm:text-sm">
+              Welcome to a Lost World
+            </p>
+
+            <h1 className="mt-5 inline-flex flex-col leading-none text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.65)]">
+              <span className="font-heading text-5xl font-bold tracking-[0.32em] sm:text-7xl">
                 MESOZOIC
               </span>
-              <span className="mt-2 inline-flex items-center justify-center gap-3">
-                <span className="h-px w-10 bg-current opacity-90 sm:w-12" aria-hidden />
-                <span className="font-heading text-xl font-semibold tracking-[0.26em] sm:text-2xl">
+              <span className="mt-3 inline-flex items-center justify-center gap-3">
+                <span
+                  className="h-px w-10 bg-accent opacity-90 sm:w-16"
+                  aria-hidden
+                />
+                <span className="font-heading text-2xl font-semibold tracking-[0.32em] sm:text-3xl">
                   ISLE
                 </span>
-                <span className="h-px w-10 bg-current opacity-90 sm:w-12" aria-hidden />
+                <span
+                  className="h-px w-10 bg-accent opacity-90 sm:w-16"
+                  aria-hidden
+                />
               </span>
             </h1>
 
-            <p className="mt-6 max-w-lg text-base text-white/90 drop-shadow-md sm:text-lg">
-              Experience prehistoric adventures on our dinosaur-themed island.
+            <p className="mt-8 max-w-xl text-base font-medium text-white/95 drop-shadow-md sm:text-lg">
+              Where ancient giants still roam and untamed shores await — step
+              into prehistoric wonder on our island like no other.
             </p>
 
             <Button
               size="lg"
               onClick={handleBookAdventure}
-              className="mt-10 h-12 gap-3 rounded-full bg-accent px-8 text-base font-heading font-semibold tracking-wide text-black shadow-lg ring-1 ring-black/5 transition-all duration-300 hover:bg-accent/90 hover:shadow-xl hover:-translate-y-0.5"
+              className="mt-10 h-12 gap-3 rounded-full bg-accent px-8 text-base font-heading font-semibold tracking-wide text-black shadow-lg ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#d48806] hover:underline hover:underline-offset-4 hover:shadow-xl active:-translate-y-0.5 active:bg-[#d48806] active:underline active:underline-offset-4 active:shadow-xl"
             >
               Book Your Adventure
-              <ArrowRight className="size-5 transition-transform duration-300 group-hover/button:translate-x-1" />
+              <ArrowRight className="size-5 transition-transform duration-300 group-hover/button:translate-x-1 group-active/button:translate-x-1" />
             </Button>
           </div>
         </div>
       </div>
+
     </section>
   );
 }
