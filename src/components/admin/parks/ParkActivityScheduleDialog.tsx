@@ -62,11 +62,18 @@ function toTimeInput(value: string | null): string {
   return value.length >= 5 ? value.slice(0, 5) : value;
 }
 
-function toApiTime(value: string): string | null {
+function toApiTime(value: string): string {
   const trimmed = value.trim();
-  if (trimmed === "") return null;
   // API accepts H:i:s — pad to include seconds if the user didn't.
   return trimmed.length === 5 ? `${trimmed}:00` : trimmed;
+}
+
+function todayIso(): string {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function emptyState(): FormState {
@@ -79,16 +86,12 @@ function emptyState(): FormState {
   };
 }
 
+// DESD-95: end_time is canonical and always present on read.
 function fromSchedule(schedule: ParkActivitySchedule): FormState {
   return {
-    date: schedule.date ?? "",
+    date: schedule.date,
     start_time: toTimeInput(schedule.start_time),
-    // Only prefill explicit end times — derived values shouldn't round-trip as
-    // an override since the server derives them from activity.duration.
-    end_time:
-      schedule.end_time_source === "explicit"
-        ? toTimeInput(schedule.end_time)
-        : "",
+    end_time: toTimeInput(schedule.end_time),
     status: schedule.status,
     notes: schedule.notes ?? "",
   };
@@ -123,7 +126,7 @@ export function ParkActivityScheduleDialog({
 
   const buildPayload = (): ParkActivityScheduleInput => ({
     date: form.date,
-    start_time: toApiTime(form.start_time) ?? form.start_time,
+    start_time: toApiTime(form.start_time),
     end_time: toApiTime(form.end_time),
     status: form.status,
     notes: form.notes.trim() === "" ? null : form.notes,
@@ -155,8 +158,22 @@ export function ParkActivityScheduleDialog({
     }
   };
 
+  const sameStartEnd =
+    form.start_time !== "" &&
+    form.end_time !== "" &&
+    form.start_time === form.end_time;
+
   const submitDisabled =
-    submitting || form.date === "" || form.start_time === "";
+    submitting ||
+    form.date === "" ||
+    form.start_time === "" ||
+    form.end_time === "" ||
+    sameStartEnd;
+
+  // DESD-95: schedule create rejects past dates. Only constrain create — on
+  // edit, status/notes tweaks on past schedules remain allowed (server only
+  // blocks moving the date itself to the past).
+  const minDate = mode.kind === "create" ? todayIso() : undefined;
 
   return (
     <Dialog
@@ -175,6 +192,7 @@ export function ParkActivityScheduleDialog({
             <DatePicker
               value={form.date}
               onChange={(next) => setField("date", next)}
+              min={minDate}
             />
           </FormField>
 
@@ -195,15 +213,21 @@ export function ParkActivityScheduleDialog({
               label="End time"
               name="end_time"
               errors={fieldErrors}
-              helper="Optional. Derived from activity duration when blank."
+              required
+              helper="Must fit inside park hours; overnight (end before start) is OK."
             >
               <TimePicker
                 value={form.end_time}
                 onChange={(next) => setField("end_time", next)}
-                placeholder="Auto"
               />
             </FormField>
           </div>
+
+          {sameStartEnd ? (
+            <p className="text-sm text-destructive">
+              End time must differ from start time.
+            </p>
+          ) : null}
 
           <FormField label="Status" name="status" errors={fieldErrors}>
             <Select
