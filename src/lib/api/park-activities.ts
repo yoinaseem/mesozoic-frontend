@@ -3,6 +3,8 @@ import type { ParkActivity } from "@/types/booking";
 
 type DataEnvelope<T> = { data: T };
 
+// DESD-95: `max_capacity` must be ≤ park.capacity (server enforces); the
+// admin form mirrors the constraint by passing the park's capacity in.
 export type ParkActivityInput = {
   name: string;
   description?: string | null;
@@ -45,4 +47,12 @@ export async function deleteParkActivity(parkId: number, activityId: number) {
   return apiRequest<null>(`/theme-parks/${parkId}/activities/${activityId}`, {
     method: "DELETE",
   });
+}
+
+// DESD-95: activities are soft-deleted. 409 if parent park is still archived.
+export async function restoreParkActivity(parkId: number, activityId: number) {
+  return apiRequest<DataEnvelope<ParkActivity>>(
+    `/theme-parks/${parkId}/activities/${activityId}/restore`,
+    { method: "POST" },
+  );
 }

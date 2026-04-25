@@ -6,10 +6,12 @@ import type {
 
 type DataEnvelope<T> = { data: T };
 
+// DESD-95: `end_time` is now required + non-null. Past dates rejected on
+// create. Manual creation forbidden when the parent activity is_all_day=true.
 export type ParkActivityScheduleInput = {
   date: string;
   start_time: string;
-  end_time?: string | null;
+  end_time: string;
   status?: ParkActivityScheduleStatus;
   notes?: string | null;
 };
@@ -45,5 +47,18 @@ export async function deleteParkActivitySchedule(
   return apiRequest<null>(
     `/theme-parks/${parkId}/activities/${activityId}/schedules/${scheduleId}`,
     { method: "DELETE" },
+  );
+}
+
+// DESD-95: schedules are soft-deleted. 409 if parent park or activity is
+// still archived.
+export async function restoreParkActivitySchedule(
+  parkId: number,
+  activityId: number,
+  scheduleId: number,
+) {
+  return apiRequest<DataEnvelope<ParkActivitySchedule>>(
+    `/theme-parks/${parkId}/activities/${activityId}/schedules/${scheduleId}/restore`,
+    { method: "POST" },
   );
 }

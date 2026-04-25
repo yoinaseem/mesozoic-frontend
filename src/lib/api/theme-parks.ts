@@ -50,6 +50,16 @@ export async function deleteThemePark(parkId: number) {
   return apiRequest<null>(`/theme-parks/${parkId}`, { method: "DELETE" });
 }
 
+// DESD-95: parks are soft-deleted. Restore un-archives the park and cascade-
+// restores every trashed activity + schedule under it. 409 if the parent…
+// (parks are top-level, so 409 only fires from race conditions).
+export async function restoreThemePark(parkId: number) {
+  return apiRequest<DataEnvelope<ThemePark>>(
+    `/theme-parks/${parkId}/restore`,
+    { method: "POST" },
+  );
+}
+
 export async function listParkActivities(parkId: number, page = 1) {
   return apiRequest<Paginated<ParkActivity>>(
     `/theme-parks/${parkId}/activities?page=${page}`,
