@@ -15,6 +15,7 @@ import { RowActions, type RowActionItem } from "@/components/admin/RowActions";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -85,6 +86,15 @@ function FilterSelect({
           ))}
         </SelectContent>
       </Select>
+    </div>
+  );
+}
+
+function FilterSkeleton({ className }: { className?: string }) {
+  return (
+    <div className={cn("space-y-1", className)}>
+      <Skeleton className="h-3 w-16" />
+      <Skeleton className="h-8 w-full" />
     </div>
   );
 }
@@ -455,71 +465,81 @@ export default function HotelBookingsPage() {
         }
       />
 
-      <div className="flex flex-col gap-3 rounded-xl border bg-muted/20 p-3 sm:flex-row sm:flex-wrap sm:items-end">
-        <FilterSelect
-          label="Status"
-          value={status ?? ""}
-          options={STATUS_OPTIONS}
-          onChange={(v) => updateFilter("status", v || null)}
-          className="sm:w-[10rem]"
-        />
-
-        {showHotelFilter ? (
+      {hotelsLoaded ? (
+        <div className="flex flex-col gap-3 rounded-xl border bg-muted/20 p-3 sm:flex-row sm:flex-wrap sm:items-end">
           <FilterSelect
-            label="Hotel"
-            value={selectedHotelId !== null ? String(selectedHotelId) : ""}
-            options={hotelOptions}
-            onChange={(v) =>
-              // Swapping or clearing the hotel invalidates the room-type filter,
-              // so we batch both writes to avoid clobbering the URL.
-              updateFilters({
-                hotel_id: v || null,
-                room_type_id: null,
-              })
-            }
-            className="sm:w-[14rem]"
+            label="Status"
+            value={status ?? ""}
+            options={STATUS_OPTIONS}
+            onChange={(v) => updateFilter("status", v || null)}
+            className="sm:w-[10rem]"
           />
-        ) : null}
 
-        {showRoomTypeFilter ? (
-          <FilterSelect
-            label="Room Type"
-            value={roomTypeId !== null ? String(roomTypeId) : ""}
-            options={roomTypeOptions}
-            onChange={(v) => updateFilter("room_type_id", v || null)}
-            className="sm:w-[14rem]"
-          />
-        ) : null}
+          {showHotelFilter ? (
+            <FilterSelect
+              label="Hotel"
+              value={selectedHotelId !== null ? String(selectedHotelId) : ""}
+              options={hotelOptions}
+              onChange={(v) =>
+                // Swapping or clearing the hotel invalidates the room-type filter,
+                // so we batch both writes to avoid clobbering the URL.
+                updateFilters({
+                  hotel_id: v || null,
+                  room_type_id: null,
+                })
+              }
+              className="sm:w-[14rem]"
+            />
+          ) : null}
 
-        <div className="space-y-1 sm:w-[11rem]">
-          <label
-            htmlFor="bookings-from"
-            className="block text-xs font-medium text-muted-foreground"
-          >
-            Check-in from
-          </label>
-          <DatePicker
-            id="bookings-from"
-            value={from || null}
-            onChange={(v) => updateFilter("from", v || null)}
-            max={to || undefined}
-          />
+          {showRoomTypeFilter ? (
+            <FilterSelect
+              label="Room Type"
+              value={roomTypeId !== null ? String(roomTypeId) : ""}
+              options={roomTypeOptions}
+              onChange={(v) => updateFilter("room_type_id", v || null)}
+              className="sm:w-[14rem]"
+            />
+          ) : null}
+
+          <div className="space-y-1 sm:w-[11rem]">
+            <label
+              htmlFor="bookings-from"
+              className="block text-xs font-medium text-muted-foreground"
+            >
+              Check-in from
+            </label>
+            <DatePicker
+              id="bookings-from"
+              value={from || null}
+              onChange={(v) => updateFilter("from", v || null)}
+              max={to || undefined}
+            />
+          </div>
+          <div className="space-y-1 sm:w-[11rem]">
+            <label
+              htmlFor="bookings-to"
+              className="block text-xs font-medium text-muted-foreground"
+            >
+              Check-in to
+            </label>
+            <DatePicker
+              id="bookings-to"
+              value={to || null}
+              onChange={(v) => updateFilter("to", v || null)}
+              min={from || undefined}
+            />
+          </div>
         </div>
-        <div className="space-y-1 sm:w-[11rem]">
-          <label
-            htmlFor="bookings-to"
-            className="block text-xs font-medium text-muted-foreground"
-          >
-            Check-in to
-          </label>
-          <DatePicker
-            id="bookings-to"
-            value={to || null}
-            onChange={(v) => updateFilter("to", v || null)}
-            min={from || undefined}
-          />
+      ) : (
+        <div className="flex flex-col gap-3 rounded-xl border bg-muted/20 p-3 sm:flex-row sm:flex-wrap sm:items-end">
+          <FilterSkeleton className="sm:w-[10rem]" />
+          <FilterSkeleton className="sm:w-[14rem]" />
+          <FilterSkeleton className="sm:w-[14rem]" />
+          <FilterSkeleton className="sm:w-[11rem]" />
+          <FilterSkeleton className="sm:w-[11rem]" />
         </div>
-      </div>
+      )}
 
       <DataTable<RoomBooking>
         columns={columns}
