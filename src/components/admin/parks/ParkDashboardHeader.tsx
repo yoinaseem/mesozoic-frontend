@@ -1,7 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { MailIcon, PencilIcon, PhoneIcon, Trash2Icon } from "lucide-react";
+import {
+  ClockIcon,
+  MailIcon,
+  PencilIcon,
+  PhoneIcon,
+  Trash2Icon,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/auth-context";
@@ -11,14 +17,17 @@ type ParkDashboardHeaderProps = {
   park: ThemePark;
   onEdit: () => void;
   onDelete: () => void;
+  onManageHours: () => void;
 };
 
 export function ParkDashboardHeader({
   park,
   onEdit,
   onDelete,
+  onManageHours,
 }: ParkDashboardHeaderProps) {
   const { hasPermission } = useAuth();
+  const canView = hasPermission("park.view");
   const canEdit = hasPermission("park.update");
   const canDelete = hasPermission("park.delete");
 
@@ -57,6 +66,12 @@ export function ParkDashboardHeader({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {canView ? (
+            <Button size="sm" variant="outline" onClick={onManageHours}>
+              <ClockIcon />
+              Manage hours
+            </Button>
+          ) : null}
           {canEdit ? (
             <Button size="sm" variant="outline" onClick={onEdit}>
               <PencilIcon />

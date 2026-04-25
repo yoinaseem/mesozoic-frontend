@@ -92,7 +92,14 @@ export function TimePicker({
           {parsed ? formatDisplay(parsed) : placeholder}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align={align}>
+      <PopoverContent
+        className="w-auto p-0"
+        align={align}
+        // Radix's outer layer can swallow wheel events targeted at scrollable
+        // descendants. Stopping propagation here lets the trackpad/wheel reach
+        // the columns natively.
+        onWheel={(event) => event.stopPropagation()}
+      >
         <div
           className="flex h-64"
           role="group"
@@ -138,6 +145,24 @@ function TimeColumn({ label, values, selected, onSelect }: TimeColumnProps) {
     }
   }, [selected]);
 
+  // Some browsers fire `wheel` as non-passive on the popover's overlay layer,
+  // which calls preventDefault and prevents the inner column from scrolling.
+  // Manually translate wheel deltas into scrollTop adjustments — this works
+  // for trackpad two-finger scroll, mouse wheel, and shift-wheel.
+  React.useEffect(() => {
+    const node = listRef.current;
+    if (!node) return;
+    const handler = (event: WheelEvent) => {
+      // Only intervene when there's something to scroll.
+      if (node.scrollHeight <= node.clientHeight) return;
+      event.preventDefault();
+      event.stopPropagation();
+      node.scrollTop += event.deltaY;
+    };
+    node.addEventListener("wheel", handler, { passive: false });
+    return () => node.removeEventListener("wheel", handler);
+  }, []);
+
   return (
     <div className="flex w-20 flex-col">
       <div className="border-b px-2 py-1.5 text-center text-xs font-medium text-muted-foreground">
@@ -145,9 +170,10 @@ function TimeColumn({ label, values, selected, onSelect }: TimeColumnProps) {
       </div>
       <div
         ref={listRef}
-        className="flex-1 overflow-y-auto p-1"
+        className="time-picker-column flex-1 overflow-y-auto overscroll-contain p-1"
         role="listbox"
         aria-label={label}
+        tabIndex={0}
       >
         {values.map((v) => {
           const isSelected = v === selected;

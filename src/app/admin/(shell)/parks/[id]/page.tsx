@@ -139,6 +139,7 @@ export default function ParkDashboardPage({
         park={park}
         onEdit={() => router.push(`/admin/parks/${park.id}/edit`)}
         onDelete={() => setShowDeleteConfirm(true)}
+        onManageHours={() => router.push(`/admin/parks/${park.id}/hours`)}
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

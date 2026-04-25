@@ -292,6 +292,26 @@
   .btn-accent:disabled {
     opacity: 0.6;
   }
+
+  /* Time picker columns — always-visible thin scrollbar so users immediately
+     see the area is scrollable. */
+  .time-picker-column {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+  .time-picker-column::-webkit-scrollbar {
+    width: 6px;
+  }
+  .time-picker-column::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .time-picker-column::-webkit-scrollbar-thumb {
+    background-color: var(--color-border);
+    border-radius: 3px;
+  }
+  .time-picker-column::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-text-muted);
+  }
 }
 
 @theme inline {
