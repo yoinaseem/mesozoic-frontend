@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 type TeamMember = {
   name: string;
@@ -62,6 +62,7 @@ function getCardStep(scroller: HTMLElement): number {
 
 export function OurTeamCarousel() {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const recenter = useCallback(() => {
     const el = scrollerRef.current;
@@ -89,6 +90,7 @@ export function OurTeamCarousel() {
     if (!el) return;
     let settleTimer: ReturnType<typeof setTimeout> | null = null;
     const onScroll = () => {
+      setIsTransitioning(true);
       if (settleTimer) clearTimeout(settleTimer);
       settleTimer = setTimeout(() => {
         const step = getCardStep(el);
@@ -98,6 +100,7 @@ export function OurTeamCarousel() {
         const middleEnd = cycleWidth * 2;
         while (el.scrollLeft >= middleEnd) el.scrollLeft -= cycleWidth;
         while (el.scrollLeft < middleStart) el.scrollLeft += cycleWidth;
+        setIsTransitioning(false);
       }, 140);
     };
     el.addEventListener("scroll", onScroll, { passive: true });
@@ -112,6 +115,7 @@ export function OurTeamCarousel() {
     if (!el) return;
     const step = getCardStep(el);
     if (step === 0) return;
+    setIsTransitioning(true);
     el.scrollBy({
       left: dir === "next" ? step : -step,
       behavior: "smooth",
@@ -122,28 +126,46 @@ export function OurTeamCarousel() {
     <div className="relative">
       <div
         ref={scrollerRef}
-        className="-mx-6 flex snap-x snap-mandatory gap-6 overflow-x-auto px-6 pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex snap-x snap-mandatory gap-6 overflow-x-auto pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        onPointerDown={() => setIsTransitioning(true)}
+        onTouchStart={() => setIsTransitioning(true)}
       >
         {RENDERED.map((member, i) => (
           <article
             key={`${member.name}-${i}`}
             data-team-card
-            className="bg-surface ring-black/5 hover:ring-sage flex w-[85%] shrink-0 snap-start flex-col rounded-2xl p-8 shadow-sm ring-1 transition hover:shadow-md sm:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-3rem)/3)]"
+            className={`group/depth bg-[#e7e7eb] dark:bg-[#0a1435] relative flex w-[85%] shrink-0 snap-start flex-col overflow-hidden rounded-3xl border border-black/20 p-8 shadow-md ring-1 ring-black/10 transition-all duration-500 hover:border-black/30 hover:ring-black/20 hover:shadow-lg motion-reduce:transition-none dark:border-white/15 dark:ring-black/20 dark:hover:border-accent/45 perspective-distant md:w-[calc((100%-3rem)/3)] ${
+              isTransitioning ? "opacity-65" : "opacity-100"
+            }`}
           >
             <div
+              className="pointer-events-none absolute inset-0 bg-linear-to-b from-white/20 to-transparent dark:from-black/20 dark:to-black/8"
               aria-hidden
-              className="bg-primary/10 text-primary flex h-20 w-20 items-center justify-center rounded-full text-2xl font-semibold"
+            />
+            <div
+              className={`relative z-10 flex h-full flex-col transition-transform duration-700 ease-out will-change-transform motion-reduce:transition-none motion-reduce:transform-none ${
+                i % 2 === 0
+                  ? "transform-[translateZ(0)_scale(1)_rotateX(0deg)_rotateY(0deg)] group-hover/depth:transform-[translateZ(22px)_scale(1.01)_rotateX(1deg)_rotateY(-1.6deg)] group-active/depth:transform-[translateZ(22px)_scale(1.01)_rotateX(1deg)_rotateY(-1.6deg)]"
+                  : "transform-[translateZ(0)_scale(1)_rotateX(0deg)_rotateY(0deg)] group-hover/depth:transform-[translateZ(22px)_scale(1.01)_rotateX(1deg)_rotateY(1.6deg)] group-active/depth:transform-[translateZ(22px)_scale(1.01)_rotateX(1deg)_rotateY(1.6deg)]"
+              }`}
             >
-              {member.initials}
-            </div>
-            <p className="text-base-color mt-6 flex-1 text-base leading-relaxed">
-              {member.bio}
-            </p>
-            <div className="border-base mt-6 border-t pt-5">
-              <p className="font-heading text-primary-deep text-lg font-semibold">
-                {member.name}
+              <div
+                aria-hidden
+                className="bg-primary/10 text-primary dark:bg-white/15 dark:text-white flex h-20 w-20 items-center justify-center rounded-full text-2xl font-semibold"
+              >
+                {member.initials}
+              </div>
+              <p className="mt-6 flex-1 text-base leading-relaxed text-black/80 dark:text-white/90">
+                {member.bio}
               </p>
-              <p className="text-lagoon text-sm font-medium">{member.role}</p>
+              <div className="mt-6 border-t border-black/15 pt-5 dark:border-white/20">
+                <p className="font-heading text-lg font-semibold text-black dark:text-white">
+                  {member.name}
+                </p>
+                <p className="text-sm font-semibold text-primary dark:text-[#fbbf24]">
+                  {member.role}
+                </p>
+              </div>
             </div>
           </article>
         ))}
@@ -153,18 +175,24 @@ export function OurTeamCarousel() {
         type="button"
         onClick={() => cycle("prev")}
         aria-label="Previous team members"
-        className="bg-surface text-primary ring-black/5 hover:bg-primary hover:text-primary-foreground focus-visible:ring-primary/40 absolute left-1 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full shadow-md ring-1 transition focus-visible:outline-none focus-visible:ring-2 md:left-2 lg:-left-5"
+        className="group absolute bottom-0 left-0 top-0 z-20 inline-flex w-16 -translate-x-[calc(100%+12px)] items-center justify-center bg-transparent md:w-20"
       >
-        <ArrowLeft className="h-5 w-5" />
+        <ChevronLeft
+          className="size-8 text-primary/35 drop-shadow-[0_2px_8px_rgba(0,0,0,0.25)] transition-all duration-300 group-hover:text-primary/95 group-active:text-primary/95"
+          strokeWidth={1.8}
+        />
       </button>
 
       <button
         type="button"
         onClick={() => cycle("next")}
         aria-label="Next team members"
-        className="bg-surface text-primary ring-black/5 hover:bg-primary hover:text-primary-foreground focus-visible:ring-primary/40 absolute right-1 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full shadow-md ring-1 transition focus-visible:outline-none focus-visible:ring-2 md:right-2 lg:-right-5"
+        className="group absolute bottom-0 right-0 top-0 z-20 inline-flex w-16 translate-x-[calc(100%+12px)] items-center justify-center bg-transparent md:w-20"
       >
-        <ArrowRight className="h-5 w-5" />
+        <ChevronRight
+          className="size-8 text-primary/35 drop-shadow-[0_2px_8px_rgba(0,0,0,0.25)] transition-all duration-300 group-hover:text-primary/95 group-active:text-primary/95"
+          strokeWidth={1.8}
+        />
       </button>
     </div>
   );
