@@ -136,7 +136,10 @@ export type ParkActivity = {
   updated_at: string;
 };
 
-export type ParkActivityScheduleStatus = "scheduled" | "cancelled" | "completed";
+export type ParkActivityScheduleStatus =
+  | "scheduled"
+  | "cancelled"
+  | "completed";
 
 export type ParkActivitySchedule = {
   id: number;
@@ -160,6 +163,30 @@ export type ReservationSummary = {
   user_id?: number;
   created_at?: string;
   updated_at?: string;
+};
+
+export type RoomBookingStatus = "confirmed" | "cancelled";
+
+export type RoomBooking = {
+  id: number;
+  reservation_id: number;
+  hotel_id: number;
+  room_type_id: number;
+  room_id: number;
+  guests: number;
+  check_in_date: string;
+  check_out_date: string;
+  nights: number;
+  price_per_night: string;
+  total_price: string;
+  status: RoomBookingStatus;
+  cancelled_at: string | null;
+  reservation?: ReservationSummary;
+  hotel?: Hotel;
+  room_type?: RoomType;
+  room?: Room;
+  created_at: string;
+  updated_at: string;
 };
 
 export type ParkActivityBookingStatus = "confirmed" | "cancelled";
