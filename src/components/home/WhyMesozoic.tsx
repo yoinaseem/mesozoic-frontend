@@ -62,10 +62,10 @@ export function WhyMesozoic() {
         <div className="mt-12 text-center">
           <Link
             href="/about"
-            className="text-primary inline-flex items-center gap-2 font-heading text-sm font-semibold uppercase tracking-wider transition-opacity hover:opacity-80"
+            className="text-primary group inline-flex items-center gap-2 font-heading text-sm font-semibold uppercase tracking-wider transition-all duration-300 hover:-translate-y-0.5 hover:opacity-80 hover:underline hover:underline-offset-4"
           >
             Read our full story
-            <ArrowRight className="size-4" />
+            <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-0.5" />
           </Link>
         </div>
       </div>

@@ -249,7 +249,7 @@ export default function AboutPage() {
           <div className="mt-8">
             <Link
               href="/book"
-              className="bg-accent inline-flex h-12 items-center gap-3 rounded-full px-8 font-heading text-base font-semibold tracking-wide text-black shadow-lg ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#d48806] hover:opacity-100 hover:underline hover:underline-offset-4 hover:shadow-xl focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-primary-deep active:-translate-y-0.5 active:bg-[#d48806] active:opacity-100 active:underline active:underline-offset-4 active:shadow-xl motion-reduce:transition-none motion-reduce:transform-none"
+              className="bg-accent inline-flex h-12 items-center gap-3 rounded-full px-8 font-heading text-base font-semibold tracking-wide text-black shadow-lg ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#efad24] hover:opacity-100 hover:underline hover:underline-offset-4 hover:shadow-xl focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-primary-deep active:-translate-y-0.5 active:bg-[#d48806] active:opacity-100 active:underline active:underline-offset-4 active:shadow-xl motion-reduce:transition-none motion-reduce:transform-none"
             >
               Book Your Activity
               <ArrowRight

@@ -62,19 +62,19 @@ export function MomentsCarousel() {
 
   return (
     <section
-      className="bg-surface border-base border-t pt-14 md:pt-16"
+      className="bg-primary-deep border-base border-t pt-14 md:pt-16"
       aria-label="Moments on the island"
     >
       <div className="mx-auto max-w-7xl px-6">
         <div className="text-center">
-          <p className="text-primary text-sm font-semibold uppercase tracking-[0.28em]">
+          <p className="text-white/75 text-sm font-semibold uppercase tracking-[0.28em]">
             Moments on the Isle
           </p>
-          <h2 className="font-heading text-primary mt-6 text-4xl font-bold leading-tight md:text-5xl">
+          <h2 className="font-heading mt-6 text-4xl font-bold leading-tight text-white md:text-5xl">
             A glimpse of your journey.
           </h2>
           <div
-            className="bg-primary mx-auto mt-5 h-1 w-20 rounded-full"
+            className="bg-accent mx-auto mt-5 h-1 w-20 rounded-full"
             aria-hidden
           />
         </div>

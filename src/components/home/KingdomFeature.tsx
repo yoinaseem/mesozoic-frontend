@@ -57,7 +57,7 @@ export function KingdomFeature({ activities }: KingdomFeatureProps) {
             </p>
             <Link
               href="/activities"
-              className="bg-primary mt-8 inline-flex items-center gap-2 rounded-full px-6 py-3 font-heading text-sm font-semibold uppercase tracking-wider text-white shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-deep hover:opacity-100 hover:underline hover:underline-offset-4 hover:shadow-xl active:-translate-y-0.5 active:bg-primary-deep active:opacity-100 active:underline active:underline-offset-4 active:shadow-xl"
+              className="bg-primary mt-8 inline-flex items-center gap-2 rounded-full px-6 py-3 font-heading text-sm font-semibold uppercase tracking-wider text-white shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-deep hover:opacity-100 hover:shadow-xl active:-translate-y-0.5 active:bg-primary-deep active:opacity-100 active:shadow-xl"
             >
               Discover The Kingdom
               <ArrowRight className="size-4" />
