@@ -23,6 +23,10 @@ type ParkActivityFormMode =
 
 type ParkActivityFormProps = {
   parkId: number;
+  // DESD-95: `max_capacity` must be ≤ park.capacity. Pass the park's cap in
+  // so the form can both `max=` the input and surface a friendly message
+  // before the round-trip.
+  parkCapacity?: number | null;
   mode: ParkActivityFormMode;
 };
 
@@ -49,7 +53,11 @@ function buildInitialState(initial?: ParkActivity): FormState {
   };
 }
 
-export function ParkActivityForm({ parkId, mode }: ParkActivityFormProps) {
+export function ParkActivityForm({
+  parkId,
+  parkCapacity,
+  mode,
+}: ParkActivityFormProps) {
   const router = useRouter();
   const snapshot = useMemo(
     () => buildInitialState(mode.initial),
@@ -204,12 +212,17 @@ export function ParkActivityForm({ parkId, mode }: ParkActivityFormProps) {
           label="Max capacity"
           name="max_capacity"
           errors={fieldErrors}
-          helper="Concurrent guests per session"
+          helper={
+            parkCapacity != null
+              ? `Concurrent guests per session (≤ park capacity of ${parkCapacity})`
+              : "Concurrent guests per session"
+          }
           required
         >
           <Input
             type="number"
             min={1}
+            max={parkCapacity ?? undefined}
             required
             inputMode="numeric"
             value={form.max_capacity}

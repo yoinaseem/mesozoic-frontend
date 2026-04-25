@@ -90,7 +90,11 @@ export default function NewParkActivityPage({
             { label: "New activity" },
           ]}
         />
-        <ParkActivityForm parkId={parkId} mode={{ kind: "create" }} />
+        <ParkActivityForm
+          parkId={parkId}
+          parkCapacity={park.capacity}
+          mode={{ kind: "create" }}
+        />
       </div>
     </PermissionGate>
   );

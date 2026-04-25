@@ -97,6 +97,7 @@ export default function EditParkActivityPage({
         />
         <ParkActivityForm
           parkId={parkId}
+          parkCapacity={park.capacity}
           mode={{ kind: "edit", initial: activity }}
         />
       </div>
