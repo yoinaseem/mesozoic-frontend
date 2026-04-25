@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
 import { FormField } from "@/components/admin/FormField";
+import { HoursCascadeDialog } from "@/components/admin/parks/HoursCascadeDialog";
 import { useFieldErrors } from "@/components/admin/useFieldErrors";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,6 +19,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { TimePicker } from "@/components/ui/time-picker";
+import {
+  asHoursCascadeConflict,
+  type HoursCascadeResponse,
+} from "@/lib/api/park-cascade";
 import {
   createParkHourOverride,
   updateParkHourOverride,
@@ -61,6 +66,7 @@ export function ParkHourOverrideDialog({
   const [closeTime, setCloseTime] = useState("");
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [conflict, setConflict] = useState<HoursCascadeResponse | null>(null);
 
   const { formError, fieldErrors, reset, setFromApiError } = useFieldErrors();
 
@@ -83,28 +89,55 @@ export function ParkHourOverrideDialog({
     }
   }, [open, mode, reset]);
 
-  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    reset();
-    setSubmitting(true);
-
-    // Per API §9: both null = closed; both set = explicit hours; partial = 422.
-    // Toggling "Closed" wipes the times so we never accidentally submit a partial.
+  // Per API §9: both null = closed; both set = explicit hours; partial = 422.
+  // Toggling "Closed" wipes the times so we never accidentally submit a
+  // partial. DESD-95 hybrid cascade is plumbed via the `on_conflict` param.
+  const submit = async (onConflict: "reject" | "cascade") => {
     const payload: ParkHourOverrideInput = {
       date,
       open_time: closed ? null : toApiTime(openTime),
       close_time: closed ? null : toApiTime(closeTime),
       note: note.trim() === "" ? null : note,
+      on_conflict: onConflict,
     };
+    if (mode.kind === "create") {
+      await createParkHourOverride(parkId, payload);
+    } else {
+      await updateParkHourOverride(parkId, mode.override.id, payload);
+    }
+  };
+
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    reset();
+    setSubmitting(true);
 
     try {
-      if (mode.kind === "create") {
-        await createParkHourOverride(parkId, payload);
-        toast.success("Override created.");
+      await submit("reject");
+      toast.success(mode.kind === "create" ? "Override created." : "Override updated.");
+      onSuccess();
+    } catch (error) {
+      const cascade = asHoursCascadeConflict(error);
+      if (cascade) {
+        setConflict(cascade);
       } else {
-        await updateParkHourOverride(parkId, mode.override.id, payload);
-        toast.success("Override updated.");
+        setFromApiError(error);
       }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCascadeConfirm = async () => {
+    setSubmitting(true);
+    try {
+      await submit("cascade");
+      toast.success(
+        mode.kind === "create"
+          ? "Override created (with cascade)."
+          : "Override updated (with cascade).",
+      );
+      setConflict(null);
       onSuccess();
     } catch (error) {
       setFromApiError(error);
@@ -219,6 +252,15 @@ export function ParkHourOverrideDialog({
           </DialogFooter>
         </form>
       </DialogContent>
+
+      <HoursCascadeDialog
+        open={conflict !== null}
+        onOpenChange={(next) => {
+          if (!next) setConflict(null);
+        }}
+        conflict={conflict}
+        onConfirm={handleCascadeConfirm}
+      />
     </Dialog>
   );
 }

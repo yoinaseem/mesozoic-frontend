@@ -19,11 +19,16 @@ import {
 import { useAuth } from "@/context/auth-context";
 import { ApiError, toastApiError } from "@/lib/api-client";
 import {
+  asHoursCascadeConflict,
+  type HoursCascadeResponse,
+} from "@/lib/api/park-cascade";
+import {
   deleteParkOpeningHour,
   listParkOpeningHours,
 } from "@/lib/api/park-opening-hours";
 import type { ParkOpeningDay, ParkOpeningHour } from "@/types/booking";
 
+import { HoursCascadeDialog } from "./HoursCascadeDialog";
 import {
   ParkOpeningHourDialog,
   type ParkOpeningHourDialogMode,
@@ -65,6 +70,13 @@ export function ParkOpeningHoursSection({ parkId, tick, onChanged }: Props) {
   const [pendingDelete, setPendingDelete] = useState<ParkOpeningHour | null>(
     null,
   );
+  // Holds the 409 conflict report when DELETE would invalidate live schedules.
+  // The HoursCascadeDialog renders the report and re-runs the delete with
+  // `?on_conflict=cascade`.
+  const [deleteConflict, setDeleteConflict] = useState<{
+    row: ParkOpeningHour;
+    report: HoursCascadeResponse;
+  } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -103,6 +115,30 @@ export function ParkOpeningHoursSection({ parkId, tick, onChanged }: Props) {
     try {
       await deleteParkOpeningHour(parkId, pendingDelete.id);
       toast.success(`Removed hours for ${pendingDelete.day}.`);
+      await load();
+      onChanged();
+    } catch (error) {
+      const cascade = asHoursCascadeConflict(error);
+      if (cascade) {
+        // Surface the 409 in the cascade dialog instead of toast-ing — the
+        // operator needs to see exactly what they're about to invalidate.
+        setDeleteConflict({ row: pendingDelete, report: cascade });
+        setPendingDelete(null);
+        return;
+      }
+      toastApiError(error);
+      throw error;
+    }
+  };
+
+  const handleCascadeDelete = async () => {
+    if (!deleteConflict) return;
+    try {
+      await deleteParkOpeningHour(parkId, deleteConflict.row.id, "cascade");
+      toast.success(
+        `Removed hours for ${deleteConflict.row.day} (with cascade).`,
+      );
+      setDeleteConflict(null);
       await load();
       onChanged();
     } catch (error) {
@@ -245,6 +281,15 @@ export function ParkOpeningHoursSection({ parkId, tick, onChanged }: Props) {
         description="The day will fall back to 'not configured' (treated as closed for booking)."
         confirmLabel="Remove"
         onConfirm={confirmDelete}
+      />
+
+      <HoursCascadeDialog
+        open={deleteConflict !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteConflict(null);
+        }}
+        conflict={deleteConflict?.report ?? null}
+        onConfirm={handleCascadeDelete}
       />
     </section>
   );
