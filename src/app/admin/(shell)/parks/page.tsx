@@ -15,6 +15,7 @@ import { RowActions, type RowActionItem } from "@/components/admin/RowActions";
 import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
 import { ApiError, toastApiError } from "@/lib/api-client";
+import { asBlockingBookings } from "@/lib/api/park-cascade";
 import { deleteThemePark, listThemeParks } from "@/lib/api/theme-parks";
 import type { ThemePark } from "@/types/booking";
 
@@ -150,9 +151,16 @@ export default function ParksPage() {
     if (!pendingDelete) return;
     try {
       await deleteThemePark(pendingDelete.id);
-      toast.success(`Deleted ${pendingDelete.name}.`);
+      toast.success(`Archived ${pendingDelete.name}.`);
       await load();
     } catch (error) {
+      const blocking = asBlockingBookings(error);
+      if (blocking) {
+        toast.error(
+          `Cannot archive — ${blocking.blocking_bookings} upcoming booking(s) reference this park. Cancel them first.`,
+        );
+        throw error;
+      }
       toastApiError(error);
       throw error;
     }

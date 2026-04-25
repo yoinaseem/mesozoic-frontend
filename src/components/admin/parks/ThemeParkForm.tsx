@@ -10,6 +10,7 @@ import { TagInput } from "@/components/admin/TagInput";
 import { useFieldErrors } from "@/components/admin/useFieldErrors";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { asCapacityLower } from "@/lib/api/park-cascade";
 import {
   createThemePark,
   updateThemePark,
@@ -128,7 +129,20 @@ export function ThemeParkForm({ mode }: ThemeParkFormProps) {
         router.push(`/admin/parks/${mode.initial.id}`);
       }
     } catch (error) {
-      setFromApiError(error);
+      // DESD-95: lowering park.capacity below any child activity's
+      // max_capacity returns 409 with the offenders. Surface them so the
+      // operator knows what to lower first.
+      const capacity = asCapacityLower(error);
+      if (capacity) {
+        const list = capacity.offending_activities
+          .map((a) => `${a.name} (${a.max_capacity})`)
+          .join(", ");
+        toast.error(
+          `Cannot lower capacity below: ${list}. Lower those activities' max capacity first.`,
+        );
+      } else {
+        setFromApiError(error);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -193,7 +207,11 @@ export function ThemeParkForm({ mode }: ThemeParkFormProps) {
           label="Capacity"
           name="capacity"
           errors={fieldErrors}
-          helper="Maximum guests per day"
+          helper={
+            mode.kind === "edit" && mode.initial.activities?.length
+              ? "Maximum guests per day. Cannot be lowered below any activity's max capacity."
+              : "Maximum guests per day"
+          }
           required
         >
           <Input
