@@ -141,13 +141,16 @@ export type ParkActivityScheduleStatus =
   | "cancelled"
   | "completed";
 
+// As of DESD-95: `start_time` and `end_time` are both NOT NULL on the
+// schedule row. `end_time_source` is retained for one release for backward
+// compatibility but is always `'explicit'` now.
 export type ParkActivitySchedule = {
   id: number;
   park_activity_id: number;
-  date: string | null;
-  start_time: string | null;
-  end_time: string | null;
-  end_time_source: "explicit" | "derived" | null;
+  date: string;
+  start_time: string;
+  end_time: string;
+  end_time_source: "explicit";
   status: ParkActivityScheduleStatus;
   notes: string | null;
   activity?: ParkActivity;
