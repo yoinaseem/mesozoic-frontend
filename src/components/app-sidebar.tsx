@@ -25,8 +25,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   // live hotel) get a one-click jump from the sidebar into each hotel they
   // manage. Fetched once on mount; falls back silently to the static config
   // if the request fails.
-  const isHotelManagerOnly =
-    hasRole("hotel-manager") && !hasRole("superadmin");
+  const isHotelManagerOnly = hasRole("hotel-manager") && !hasRole("superadmin");
   const [myHotels, setMyHotels] = useState<MyHotel[] | null>(null);
 
   useEffect(() => {
@@ -74,9 +73,10 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/admin/dashboard">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-white -primary-foreground">
+                {/* Please add actual logo once finalized */}
+                {/* <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-white -primary-foreground">
                   <TreePalm className="size-4" />
-                </div>
+                </div> */}
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">Mesozoic Isle</span>
                   <span className="truncate text-xs">Management</span>
