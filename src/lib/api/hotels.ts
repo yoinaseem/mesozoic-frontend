@@ -73,3 +73,35 @@ export async function getHotelAvailability(
   const path = `/hotels/${hotelId}/availability${query ? `?${query}` : ""}`;
   return apiRequest<{ data: HotelAvailability }>(path, { skipAuth: true });
 }
+
+export type HotelAvailabilityDailyDay = {
+  date: string;
+  free: number;
+};
+
+export type HotelAvailabilityDailyRoomType = {
+  room_type_id: number;
+  name: string;
+  total: number;
+  days: HotelAvailabilityDailyDay[];
+};
+
+export type HotelAvailabilityDaily = {
+  hotel_id: number;
+  from: string;
+  to: string;
+  room_types: HotelAvailabilityDailyRoomType[];
+};
+
+export async function getHotelAvailabilityDaily(
+  hotelId: number,
+  from?: string,
+  to?: string,
+) {
+  const params = new URLSearchParams();
+  if (from) params.set("from", from);
+  if (to) params.set("to", to);
+  const query = params.toString();
+  const path = `/hotels/${hotelId}/availability/daily${query ? `?${query}` : ""}`;
+  return apiRequest<{ data: HotelAvailabilityDaily }>(path, { skipAuth: true });
+}

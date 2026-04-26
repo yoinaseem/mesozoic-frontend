@@ -1,19 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { useBookingCart } from "@/context/booking-cart-context";
-import { getHotel, listHotels } from "@/lib/api/hotels";
+import {
+  getHotel,
+  getHotelAvailabilityDaily,
+  listHotels,
+  type HotelAvailabilityDailyDay,
+} from "@/lib/api/hotels";
 import type { Hotel, RoomType } from "@/types/booking";
+
+const AVAILABILITY_WINDOW_DAYS = 90;
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function tomorrowIso(): string {
+function isoDaysFromNow(days: number): string {
   const d = new Date();
-  d.setDate(d.getDate() + 1);
+  d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
 }
 
@@ -89,14 +96,18 @@ export function RoomStep() {
     cart.room?.roomType.id ?? null,
   );
 
-  const [checkIn, setCheckIn] = useState<string>(
-    cart.room?.checkIn ?? todayIso(),
+  const [checkIn, setCheckIn] = useState<string | null>(
+    cart.room?.checkIn ?? null,
   );
-  const [checkOut, setCheckOut] = useState<string>(
-    cart.room?.checkOut ?? tomorrowIso(),
+  const [checkOut, setCheckOut] = useState<string | null>(
+    cart.room?.checkOut ?? null,
   );
   const [guests, setGuests] = useState<number>(cart.room?.guests ?? 2);
   const [error, setError] = useState<string | null>(null);
+
+  const [availabilityDays, setAvailabilityDays] = useState<
+    HotelAvailabilityDailyDay[]
+  >([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -135,16 +146,65 @@ export function RoomStep() {
     };
   }, [selectedHotelId]);
 
+  useEffect(() => {
+    if (selectedHotelId === null || selectedRoomTypeId === null) {
+      setAvailabilityDays([]);
+      return;
+    }
+    let cancelled = false;
+    const hotelId = selectedHotelId;
+    const roomTypeId = selectedRoomTypeId;
+    getHotelAvailabilityDaily(
+      hotelId,
+      todayIso(),
+      isoDaysFromNow(AVAILABILITY_WINDOW_DAYS),
+    )
+      .then((res) => {
+        if (cancelled) return;
+        const rt = res.data.room_types.find(
+          (r) => r.room_type_id === roomTypeId,
+        );
+        setAvailabilityDays(rt?.days ?? []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAvailabilityDays([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedHotelId, selectedRoomTypeId]);
+
   const roomTypes: RoomType[] = hotelDetail?.room_types ?? [];
 
   const selectedHotel = hotels.find((h) => h.id === selectedHotelId) ?? null;
   const selectedRoomType =
     roomTypes.find((t) => t.id === selectedRoomTypeId) ?? null;
 
+  const checkInDisabledDates = useMemo(
+    () =>
+      availabilityDays.filter((d) => d.free <= 0).map((d) => d.date),
+    [availabilityDays],
+  );
+
+  // The latest check-out is the first fully-booked night >= check-in:
+  // a guest can leave the morning of that day, but cannot sleep through it.
+  const checkOutMax = useMemo(() => {
+    if (!checkIn || availabilityDays.length === 0) return undefined;
+    const firstBlocked = availabilityDays.find(
+      (d) => d.date >= checkIn && d.free <= 0,
+    );
+    return firstBlocked?.date;
+  }, [availabilityDays, checkIn]);
+
   const handleConfirm = () => {
     setError(null);
     if (!selectedHotel || !selectedRoomType) {
       setError("Pick a hotel and a room type to continue.");
+      return;
+    }
+    if (!checkIn || !checkOut) {
+      setError("Pick check-in and check-out dates.");
       return;
     }
     if (new Date(checkOut) <= new Date(checkIn)) {
@@ -283,6 +343,7 @@ export function RoomStep() {
             value={checkIn}
             onChange={setCheckIn}
             placeholder="Select check-in"
+            disabledDates={checkInDisabledDates}
           />
         </div>
         <div>
@@ -295,7 +356,8 @@ export function RoomStep() {
           <DatePicker
             id="check-out"
             className="mt-2"
-            min={checkIn}
+            min={checkIn ?? undefined}
+            max={checkOutMax}
             value={checkOut}
             onChange={setCheckOut}
             placeholder="Select check-out"
