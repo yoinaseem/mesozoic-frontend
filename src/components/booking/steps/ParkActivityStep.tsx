@@ -38,7 +38,7 @@ export function ParkActivityStep() {
   const [schedules, setSchedules] = useState<ParkActivitySchedule[]>([]);
   const [loadingSchedules, setLoadingSchedules] = useState(false);
   const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(
-    cart.parkActivity?.schedule.id ?? null,
+    cart.parkActivity?.schedule?.id ?? null,
   );
 
   const [guests, setGuests] = useState<number>(
@@ -110,10 +110,12 @@ export function ParkActivityStep() {
   const selectedSchedule =
     schedules.find((s) => s.id === selectedScheduleId) ?? null;
 
+  const isAllDay = selectedActivity?.is_all_day === true;
+
   const handleConfirm = () => {
     setError(null);
-    if (!selectedActivity || !selectedSchedule) {
-      setError("Pick an activity and a scheduled time.");
+    if (!selectedActivity) {
+      setError("Pick an activity.");
       return;
     }
     if (
@@ -127,6 +129,28 @@ export function ParkActivityStep() {
     }
     if (guests < 1) {
       setError("At least one guest is required.");
+      return;
+    }
+
+    if (isAllDay) {
+      // All-day flow: server materialises the schedule from (activity, date).
+      // Use the day-pass date as the booking date — that's the only date the
+      // user could plausibly mean for this trip, and it lines up with the
+      // (park, date) day-pass prerequisite the API enforces.
+      if (!effectiveDate) {
+        setError("Add a park ticket first so we know which date to book.");
+        return;
+      }
+      setParkActivity({
+        activity: selectedActivity,
+        date: effectiveDate,
+        guests,
+      });
+      return;
+    }
+
+    if (!selectedSchedule) {
+      setError("Pick a scheduled time.");
       return;
     }
     setParkActivity({
@@ -206,7 +230,19 @@ export function ParkActivityStep() {
         )}
       </div>
 
-      {selectedActivityId !== null ? (
+      {selectedActivityId !== null && isAllDay ? (
+        <div className="border-base bg-base/30 space-y-1 rounded-lg border p-3 text-sm">
+          <p className="text-base-color font-medium">All-day experience</p>
+          <p className="text-muted">
+            No time slot to pick — admission runs the full day.{" "}
+            {effectiveDate
+              ? `Booked for ${effectiveDate} alongside your day-pass.`
+              : "Add a park ticket first to set the date."}
+          </p>
+        </div>
+      ) : null}
+
+      {selectedActivityId !== null && !isAllDay ? (
         <div className="space-y-2">
           <label className="block text-sm font-medium text-base-color">
             Schedule

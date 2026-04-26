@@ -514,15 +514,39 @@ export function BookingCartProvider({
             fieldErrors: {},
           });
         } else {
-          try {
-            const res = await createParkActivityBooking({
-              reservation_id: rid,
-              park_activity_schedule_id: parkActivitySelection.schedule.id,
-              guests: parkActivitySelection.guests,
+          // Two payload shapes per §14: all-day uses (activity, date) so
+          // the server can materialise the schedule; timed uses an
+          // explicit schedule_id. The selection carries one or the other
+          // depending on activity.is_all_day.
+          const payload = parkActivitySelection.schedule
+            ? {
+                reservation_id: rid,
+                park_activity_schedule_id: parkActivitySelection.schedule.id,
+                guests: parkActivitySelection.guests,
+              }
+            : parkActivitySelection.date
+              ? {
+                  reservation_id: rid,
+                  park_activity_id: parkActivitySelection.activity.id,
+                  date: parkActivitySelection.date,
+                  guests: parkActivitySelection.guests,
+                }
+              : null;
+
+          if (payload === null) {
+            result.errors.push({
+              step: "park-activity",
+              message:
+                "Park activity selection is incomplete — pick a schedule or date.",
+              fieldErrors: {},
             });
-            result.parkActivityBooking = res.data;
-          } catch (error) {
-            result.errors.push(toStepError("park-activity", error));
+          } else {
+            try {
+              const res = await createParkActivityBooking(payload);
+              result.parkActivityBooking = res.data;
+            } catch (error) {
+              result.errors.push(toStepError("park-activity", error));
+            }
           }
         }
       }

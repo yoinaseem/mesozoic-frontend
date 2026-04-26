@@ -372,10 +372,16 @@ export type ParkTicketSelection = {
   guests: number;
 };
 
+// DESD-95: two booking shapes. Timed activities require an authored
+// `schedule`; all-day activities (`is_all_day=true`) carry just a `date`
+// and the server materialises the schedule on POST. Exactly one of
+// `schedule` / `date` should be set — the discriminant is the activity's
+// `is_all_day` flag.
 export type ParkActivitySelection = {
   activity: ParkActivity;
-  schedule: ParkActivitySchedule;
   guests: number;
+  schedule?: ParkActivitySchedule;
+  date?: string;
 };
 
 export type BeachActivitySelection = {

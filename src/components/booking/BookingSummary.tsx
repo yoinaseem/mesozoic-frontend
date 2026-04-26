@@ -203,9 +203,11 @@ export function BookingSummary() {
           <Line label="Activity" value={cart.parkActivity.activity.name} />
           <Line
             label="When"
-            value={`${cart.parkActivity.schedule.date ?? "—"} · ${
-              cart.parkActivity.schedule.start_time ?? "—"
-            }`}
+            value={
+              cart.parkActivity.schedule
+                ? `${cart.parkActivity.schedule.date} · ${cart.parkActivity.schedule.start_time}`
+                : `${cart.parkActivity.date ?? "—"} · all day`
+            }
           />
           <Line label="Guests" value={`${cart.parkActivity.guests}`} />
         </section>
