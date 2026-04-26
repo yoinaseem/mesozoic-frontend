@@ -33,7 +33,6 @@ export function BeachActivityStep() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoadingActivities(true);
     listBeachActivities()
       .then((res) => {
         if (cancelled) return;
@@ -50,10 +49,7 @@ export function BeachActivityStep() {
   }, []);
 
   useEffect(() => {
-    if (selectedActivityId === null) {
-      setSchedules([]);
-      return;
-    }
+    if (selectedActivityId === null) return;
     let cancelled = false;
     setLoadingSchedules(true);
     listBeachActivitySchedules(selectedActivityId)

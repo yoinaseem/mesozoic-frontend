@@ -35,7 +35,6 @@ export function FerryStep() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoadingFerries(true);
     listFerries()
       .then((res) => {
         if (cancelled) return;
@@ -52,10 +51,7 @@ export function FerryStep() {
   }, []);
 
   useEffect(() => {
-    if (selectedFerryId === null) {
-      setSchedules([]);
-      return;
-    }
+    if (selectedFerryId === null) return;
     let cancelled = false;
     setLoadingSchedules(true);
     listFerrySchedules(selectedFerryId)

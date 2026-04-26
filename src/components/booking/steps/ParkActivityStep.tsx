@@ -31,13 +31,17 @@ export function ParkActivityStep() {
     cartParkTicket?.guests ?? fallbackExistingPass?.guests ?? null;
 
   const [activities, setActivities] = useState<ParkActivity[]>([]);
-  const [loadingActivities, setLoadingActivities] = useState(false);
+  const [loadedActivitiesFor, setLoadedActivitiesFor] = useState<number | null>(
+    null,
+  );
   const [selectedActivityId, setSelectedActivityId] = useState<number | null>(
     cart.parkActivity?.activity.id ?? null,
   );
 
   const [schedules, setSchedules] = useState<ParkActivitySchedule[]>([]);
-  const [loadingSchedules, setLoadingSchedules] = useState(false);
+  const [loadedSchedulesFor, setLoadedSchedulesFor] = useState<string | null>(
+    null,
+  );
   const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(
     cart.parkActivity?.schedule?.id ?? null,
   );
@@ -47,22 +51,28 @@ export function ParkActivityStep() {
   );
   const [error, setError] = useState<string | null>(null);
 
+  // Loading is derived: true while a selection is set but its fetch hasn't
+  // landed yet. Avoids a synchronous setLoading(true) inside the effect body.
+  const loadingActivities =
+    effectiveParkId !== null && loadedActivitiesFor !== effectiveParkId;
+  const loadingSchedules =
+    effectiveParkId !== null &&
+    selectedActivityId !== null &&
+    loadedSchedulesFor !== `${effectiveParkId}-${selectedActivityId}`;
+
   useEffect(() => {
-    if (effectiveParkId === null) {
-      setActivities([]);
-      return;
-    }
+    if (effectiveParkId === null) return;
     let cancelled = false;
-    setLoadingActivities(true);
-    listParkActivities(effectiveParkId)
+    const parkId = effectiveParkId;
+    listParkActivities(parkId)
       .then((res) => {
         if (cancelled) return;
         setActivities(res.data);
-        setLoadingActivities(false);
+        setLoadedActivitiesFor(parkId);
       })
       .catch(() => {
         if (cancelled) return;
-        setLoadingActivities(false);
+        setLoadedActivitiesFor(parkId);
       });
     return () => {
       cancelled = true;
@@ -70,21 +80,18 @@ export function ParkActivityStep() {
   }, [effectiveParkId]);
 
   useEffect(() => {
-    if (effectiveParkId === null || selectedActivityId === null) {
-      setSchedules([]);
-      return;
-    }
+    if (effectiveParkId === null || selectedActivityId === null) return;
     let cancelled = false;
-    setLoadingSchedules(true);
+    const key = `${effectiveParkId}-${selectedActivityId}`;
     listParkActivitySchedules(effectiveParkId, selectedActivityId)
       .then((res) => {
         if (cancelled) return;
         setSchedules(res.data);
-        setLoadingSchedules(false);
+        setLoadedSchedulesFor(key);
       })
       .catch(() => {
         if (cancelled) return;
-        setLoadingSchedules(false);
+        setLoadedSchedulesFor(key);
       });
     return () => {
       cancelled = true;
@@ -103,8 +110,9 @@ export function ParkActivityStep() {
     });
   }, [schedules, effectiveDate, tripWindow]);
 
+  const visibleActivities = effectiveParkId === null ? [] : activities;
   const selectedActivity =
-    activities.find((a) => a.id === selectedActivityId) ?? null;
+    visibleActivities.find((a) => a.id === selectedActivityId) ?? null;
   const selectedSchedule =
     schedules.find((s) => s.id === selectedScheduleId) ?? null;
 
@@ -188,13 +196,13 @@ export function ParkActivityStep() {
         </label>
         {loadingActivities ? (
           <p className="text-muted text-sm">Loading activities…</p>
-        ) : activities.length === 0 ? (
+        ) : visibleActivities.length === 0 ? (
           <p className="text-muted text-sm">
             No activities are published for this park yet.
           </p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
-            {activities.map((activity) => {
+            {visibleActivities.map((activity) => {
               const active = selectedActivityId === activity.id;
               return (
                 <button
