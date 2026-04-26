@@ -35,6 +35,7 @@ export function BookingSummary() {
     hasAnyAddOn,
     submitting,
     submitCart,
+    consumeSubmitResult,
     reset,
     existingBookings,
     roomAlreadyExists,
@@ -53,6 +54,13 @@ export function BookingSummary() {
     const result = await submitCart();
     setLastResult(result);
 
+    // Reconcile cart with what landed on the API — drops successful
+    // ticket slots, tags posted rooms with existingId, pins the
+    // reservation id. Always run this even on full success: it's a
+    // cheap no-op when reservationId is null, and on success the
+    // reset() below clears state anyway.
+    consumeSubmitResult(result);
+
     if (result.errors.length === 0 && result.reservationId !== null) {
       toast.success("Trip booked. Check your dashboard for the details.");
       reset();
@@ -61,9 +69,9 @@ export function BookingSummary() {
     }
 
     // The room bookings are the foundation — if no reservation_id was
-    // resolved, nothing else ran. Otherwise at least the trip exists and
-    // one or more add-ons reported errors; surface a less-alarming
-    // "partial" toast so the user knows what to fix.
+    // resolved, nothing else ran. Otherwise the trip exists and one or
+    // more items reported errors; surface a less-alarming "partial"
+    // toast so the user knows what to fix.
     if (result.reservationId === null) {
       toast.error(
         result.errors[0]?.message ?? "Could not create the room booking.",

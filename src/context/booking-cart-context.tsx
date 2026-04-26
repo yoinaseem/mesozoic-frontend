@@ -147,6 +147,12 @@ type BookingCartContextValue = {
   submitting: boolean;
   submitCart: () => Promise<SubmitResult>;
   existingBookings: ExistingReservationBookings;
+  // Reconciles cart state with what just hit the API. Call this after
+  // every submitCart() so a retry doesn't re-POST items that already
+  // succeeded — posted rooms get tagged with their existingId, successful
+  // ticket slots clear, attachToReservationId pins to the new trip, and
+  // existingBookings refetches so duplicate-pre-checks see the new items.
+  consumeSubmitResult: (result: SubmitResult) => void;
   // Active step + nav helpers — lifted into context so each step can
   // render its own Previous/Next buttons without prop-drilling.
   activeStep: BookingStep;
@@ -208,6 +214,11 @@ export function BookingCartProvider({
   const [roomAlreadyExists, setRoomAlreadyExists] = useState(false);
   const [existingBookings, setExistingBookings] =
     useState<ExistingReservationBookings>(EMPTY_EXISTING);
+  // Bumping this forces the existingBookings useEffect to re-run even
+  // when attachToReservationId hasn't changed — used after a successful
+  // submit so the just-confirmed items show up in conflict pre-checks.
+  const [existingBookingsRefreshKey, setExistingBookingsRefreshKey] =
+    useState(0);
   const [activeStep, setActiveStep] = useState<BookingStep>("room");
 
   // Whenever the customer chooses to attach to an existing reservation,
@@ -265,7 +276,7 @@ export function BookingCartProvider({
     return () => {
       cancelled = true;
     };
-  }, [attachToReservationId]);
+  }, [attachToReservationId, existingBookingsRefreshKey]);
 
   // Append a room. Anchored mode keeps `roomAlreadyExists` true (added
   // rooms are still NEW for the API) — only an explicit clearRooms drops
@@ -325,6 +336,53 @@ export function BookingCartProvider({
     setAttachToReservationId(null);
     setRoomAlreadyExists(false);
     setActiveStep("room");
+  }, []);
+
+  const consumeSubmitResult = useCallback((result: SubmitResult) => {
+    if (result.reservationId === null) return;
+
+    setCart((prev) => {
+      const next = { ...prev };
+
+      // Tag posted rooms with their existingId so submitCart skips them
+      // next time. Match by the (room_type_id, check_in_date,
+      // check_out_date) tuple — there's no direct id link from selection
+      // to result, but this combo is unique-enough for cart entries the
+      // user composed in this session.
+      if (result.rooms.length > 0) {
+        next.rooms = prev.rooms.map((room) => {
+          if (room.existingId !== undefined) return room;
+          const match = result.rooms.find(
+            (rb) =>
+              rb.room_type_id === room.roomType.id &&
+              rb.check_in_date === room.checkIn &&
+              rb.check_out_date === room.checkOut,
+          );
+          return match ? { ...room, existingId: match.id } : room;
+        });
+      }
+
+      // Successful ticket slots clear so a retry doesn't re-POST them.
+      // The just-posted rows show up in existingBookings after the
+      // refresh below, so the customer still sees them in the summary.
+      if (result.parkBooking) next.parkTicket = null;
+      if (result.beachBooking) next.beachActivity = null;
+      if (result.ferryBooking) next.ferry = null;
+      if (result.parkActivityBooking) next.parkActivity = null;
+
+      return next;
+    });
+
+    // Pin the reservation id for any subsequent submits — without this,
+    // a fresh-trip submit would create the trip on attempt #1, then try
+    // to create another trip on attempt #2 because attachToReservationId
+    // never got set.
+    setAttachToReservationId(result.reservationId);
+    setReservationId(result.reservationId);
+
+    // Force the existingBookings refetch so duplicate-pre-checks (e.g.
+    // "Your existing trip already has a day-pass…") see the new items.
+    setExistingBookingsRefreshKey((k) => k + 1);
   }, []);
 
   // Anchor the cart on a reservation that already has a confirmed room.
@@ -647,6 +705,7 @@ export function BookingCartProvider({
       submitting,
       submitCart,
       existingBookings,
+      consumeSubmitResult,
       activeStep,
       setActiveStep,
       goToNextStep,
@@ -677,6 +736,7 @@ export function BookingCartProvider({
       submitting,
       submitCart,
       existingBookings,
+      consumeSubmitResult,
       activeStep,
       goToNextStep,
       goToPreviousStep,
