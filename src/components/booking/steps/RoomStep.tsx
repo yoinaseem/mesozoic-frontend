@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Trash2 } from "lucide-react";
+
+import { StepNav } from "@/components/booking/StepNav";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { useBookingCart } from "@/context/booking-cart-context";
@@ -17,85 +20,27 @@ function tomorrowIso(): string {
   return d.toISOString().slice(0, 10);
 }
 
-function AnchoredRoomSummary() {
-  const { cart, reset } = useBookingCart();
-  if (!cart.room) return null;
-  return (
-    <section className="card space-y-4">
-      <header className="space-y-1">
-        <h2 className="text-2xl font-semibold text-primary">
-          Room — already booked
-        </h2>
-        <p className="text-muted text-sm">
-          We&rsquo;re adding to your existing trip. The room below is already
-          confirmed; pick activities from the steps above.
-        </p>
-      </header>
-
-      <dl className="border-base divide-base divide-y rounded-lg border text-sm">
-        <div className="flex justify-between px-4 py-2">
-          <dt className="text-muted">Hotel</dt>
-          <dd className="font-medium">{cart.room.hotel.name}</dd>
-        </div>
-        <div className="flex justify-between px-4 py-2">
-          <dt className="text-muted">Room type</dt>
-          <dd className="font-medium">{cart.room.roomType.name}</dd>
-        </div>
-        <div className="flex justify-between px-4 py-2">
-          <dt className="text-muted">Check-in</dt>
-          <dd className="font-medium">{cart.room.checkIn}</dd>
-        </div>
-        <div className="flex justify-between px-4 py-2">
-          <dt className="text-muted">Check-out</dt>
-          <dd className="font-medium">{cart.room.checkOut}</dd>
-        </div>
-        <div className="flex justify-between px-4 py-2">
-          <dt className="text-muted">Guests</dt>
-          <dd className="font-medium">{cart.room.guests}</dd>
-        </div>
-      </dl>
-
-      <button
-        type="button"
-        className="text-sm font-semibold text-danger hover:opacity-80"
-        onClick={reset}
-      >
-        Start a new trip instead
-      </button>
-    </section>
-  );
-}
-
 export function RoomStep() {
-  const { cart, setRoom, roomAlreadyExists } = useBookingCart();
-
-  if (roomAlreadyExists) {
-    return <AnchoredRoomSummary />;
-  }
+  const { cart, addRoom, removeRoom, clearRooms, roomAlreadyExists } =
+    useBookingCart();
 
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loadingHotels, setLoadingHotels] = useState(true);
   const [hotelsError, setHotelsError] = useState<string | null>(null);
 
-  const [selectedHotelId, setSelectedHotelId] = useState<number | null>(
-    cart.room?.hotel.id ?? null,
-  );
+  const [selectedHotelId, setSelectedHotelId] = useState<number | null>(null);
   const [hotelDetail, setHotelDetail] = useState<Hotel | null>(null);
   const [hotelDetailFor, setHotelDetailFor] = useState<number | null>(null);
   const loadingHotel =
     selectedHotelId !== null && hotelDetailFor !== selectedHotelId;
 
   const [selectedRoomTypeId, setSelectedRoomTypeId] = useState<number | null>(
-    cart.room?.roomType.id ?? null,
+    null,
   );
 
-  const [checkIn, setCheckIn] = useState<string>(
-    cart.room?.checkIn ?? todayIso(),
-  );
-  const [checkOut, setCheckOut] = useState<string>(
-    cart.room?.checkOut ?? tomorrowIso(),
-  );
-  const [guests, setGuests] = useState<number>(cart.room?.guests ?? 2);
+  const [checkIn, setCheckIn] = useState<string>(todayIso());
+  const [checkOut, setCheckOut] = useState<string>(tomorrowIso());
+  const [guests, setGuests] = useState<number>(2);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -141,15 +86,22 @@ export function RoomStep() {
   const selectedRoomType =
     roomTypes.find((t) => t.id === selectedRoomTypeId) ?? null;
 
-  const handleConfirm = () => {
+  const formIsTouched =
+    selectedHotelId !== null ||
+    selectedRoomTypeId !== null ||
+    checkIn !== todayIso() ||
+    checkOut !== tomorrowIso() ||
+    guests !== 2;
+
+  const validateForm = (): boolean => {
     setError(null);
     if (!selectedHotel || !selectedRoomType) {
-      setError("Pick a hotel and a room type to continue.");
-      return;
+      setError("Pick a hotel and a room type to add the room.");
+      return false;
     }
     if (new Date(checkOut) <= new Date(checkIn)) {
       setError("Check-out must be after check-in.");
-      return;
+      return false;
     }
     if (
       selectedRoomType.capacity !== null &&
@@ -158,26 +110,58 @@ export function RoomStep() {
       setError(
         `This room type sleeps up to ${selectedRoomType.capacity} guests.`,
       );
-      return;
+      return false;
     }
     if (guests < 1) {
       setError("At least one guest is required.");
-      return;
+      return false;
     }
-    setRoom({
+    return true;
+  };
+
+  const commitRoom = (): boolean => {
+    if (!validateForm() || !selectedHotel || !selectedRoomType) return false;
+    addRoom({
       hotel: selectedHotel,
       roomType: selectedRoomType,
       checkIn,
       checkOut,
       guests,
     });
+    return true;
   };
 
-  const handleClear = () => {
-    setRoom(null);
+  const resetForm = () => {
     setSelectedHotelId(null);
     setSelectedRoomTypeId(null);
+    setHotelDetail(null);
+    setHotelDetailFor(null);
+    setCheckIn(todayIso());
+    setCheckOut(tomorrowIso());
+    setGuests(2);
     setError(null);
+  };
+
+  const handleAddAnother = () => {
+    if (commitRoom()) {
+      resetForm();
+    }
+  };
+
+  // Next handler:
+  //  - If the form has user input, validate + commit, then advance.
+  //  - If the form is untouched but at least one room is already in cart,
+  //    just advance.
+  //  - If the form is untouched and no rooms are in cart, error.
+  const handleNext = (): boolean => {
+    if (formIsTouched) {
+      return commitRoom();
+    }
+    if (cart.rooms.length === 0) {
+      setError("Add at least one room before continuing.");
+      return false;
+    }
+    return true;
   };
 
   return (
@@ -185,12 +169,51 @@ export function RoomStep() {
       <header className="space-y-1">
         <h2 className="text-2xl font-semibold text-primary">Room booking</h2>
         <p className="text-muted text-sm">
-          Every stay on the isle starts with a room. Pick your hotel, room type,
-          and dates — we&rsquo;ll assign the actual room number for you.
+          Add one or more rooms to your trip. We&rsquo;ll pick the actual room
+          number for you. Need a second room for the family? Just add another.
         </p>
       </header>
 
+      {cart.rooms.length > 0 ? (
+        <div className="space-y-2">
+          <h3 className="text-base-color text-sm font-semibold">Rooms on this trip</h3>
+          <ul className="border-base divide-base divide-y rounded-lg border">
+            {cart.rooms.map((room, index) => (
+              <li
+                key={`${room.hotel.id}-${room.roomType.id}-${room.checkIn}-${index}`}
+                className="flex items-start justify-between gap-4 px-4 py-3"
+              >
+                <div className="space-y-0.5 text-sm">
+                  <p className="text-primary font-semibold">
+                    {room.hotel.name} · {room.roomType.name}
+                  </p>
+                  <p className="text-muted">
+                    {room.checkIn} → {room.checkOut} · {room.guests} guest
+                    {room.guests === 1 ? "" : "s"}
+                    {room.existingId !== undefined ? " · already booked" : ""}
+                  </p>
+                </div>
+                {room.existingId === undefined ? (
+                  <button
+                    type="button"
+                    onClick={() => removeRoom(index)}
+                    className="text-muted hover:text-danger flex items-center gap-1 text-xs font-semibold"
+                    aria-label="Remove room"
+                  >
+                    <Trash2 className="size-4" />
+                    Remove
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       <div className="space-y-2">
+        <h3 className="text-base-color text-sm font-semibold">
+          {cart.rooms.length === 0 ? "Pick a room" : "Add another room"}
+        </h3>
         <label className="block text-sm font-medium text-base-color">
           Hotel
         </label>
@@ -322,20 +345,31 @@ export function RoomStep() {
 
       {error ? <p className="text-sm text-danger">{error}</p> : null}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="button" className="btn-primary" onClick={handleConfirm}>
-          {cart.room ? "Update room booking" : "Confirm room booking"}
-        </button>
-        {cart.room ? (
-          <button
-            type="button"
-            className="text-sm font-semibold text-danger hover:opacity-80"
-            onClick={handleClear}
-          >
-            Clear room booking
-          </button>
-        ) : null}
-      </div>
+      <StepNav
+        onNext={handleNext}
+        leadingActions={
+          <>
+            <button
+              type="button"
+              className="border-primary text-primary hover:bg-primary/5 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors"
+              onClick={handleAddAnother}
+            >
+              {cart.rooms.length === 0
+                ? "Add this room"
+                : "Add another room"}
+            </button>
+            {cart.rooms.length > 0 && !roomAlreadyExists ? (
+              <button
+                type="button"
+                className="text-sm font-semibold text-danger hover:opacity-80"
+                onClick={clearRooms}
+              >
+                Clear all rooms
+              </button>
+            ) : null}
+          </>
+        }
+      />
     </section>
   );
 }

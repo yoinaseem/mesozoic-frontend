@@ -53,23 +53,24 @@ export function BookingSummary() {
     const result = await submitCart();
     setLastResult(result);
 
-    if (result.errors.length === 0 && result.room) {
+    if (result.errors.length === 0 && result.reservationId !== null) {
       toast.success("Trip booked. Check your dashboard for the details.");
       reset();
       router.push("/dashboard");
       return;
     }
 
-    // The room booking is the foundation — if it failed, nothing else ran.
-    // Otherwise the room landed and one or more add-ons reported errors;
-    // surface a less-alarming "partial" toast so the user knows what to fix.
-    if (!result.room) {
+    // The room bookings are the foundation — if no reservation_id was
+    // resolved, nothing else ran. Otherwise at least the trip exists and
+    // one or more add-ons reported errors; surface a less-alarming
+    // "partial" toast so the user knows what to fix.
+    if (result.reservationId === null) {
       toast.error(
         result.errors[0]?.message ?? "Could not create the room booking.",
       );
     } else {
       toast.warning(
-        `Room booked, but ${result.errors.length} add-on(s) need attention.`,
+        `Trip saved, but ${result.errors.length} item(s) need attention.`,
       );
     }
   };
@@ -85,25 +86,38 @@ export function BookingSummary() {
 
       <section className="space-y-2">
         <h4 className="text-base-color text-sm font-semibold">
-          Room
+          {cart.rooms.length > 1 ? "Rooms" : "Room"}
           {roomAlreadyExists ? (
             <span className="text-muted ml-2 text-xs font-normal">
-              (already on this trip)
+              (anchored on existing trip)
             </span>
           ) : null}
         </h4>
-        {cart.room ? (
-          <div className="space-y-1">
-            <Line label="Hotel" value={cart.room.hotel.name} />
-            <Line label="Type" value={cart.room.roomType.name} />
-            <Line
-              label="Dates"
-              value={`${cart.room.checkIn} → ${cart.room.checkOut}`}
-            />
-            <Line label="Guests" value={`${cart.room.guests}`} />
-          </div>
-        ) : (
+        {cart.rooms.length === 0 ? (
           <p className="text-muted text-sm">Not selected</p>
+        ) : (
+          <ul className="space-y-3">
+            {cart.rooms.map((room, idx) => (
+              <li
+                key={`${room.hotel.id}-${room.roomType.id}-${room.checkIn}-${idx}`}
+                className="space-y-1"
+              >
+                <p className="text-primary text-sm font-semibold">
+                  {room.hotel.name} · {room.roomType.name}
+                  {room.existingId !== undefined ? (
+                    <span className="text-muted ml-2 text-xs font-normal">
+                      (existing)
+                    </span>
+                  ) : null}
+                </p>
+                <Line
+                  label="Dates"
+                  value={`${room.checkIn} → ${room.checkOut}`}
+                />
+                <Line label="Guests" value={`${room.guests}`} />
+              </li>
+            ))}
+          </ul>
         )}
       </section>
 
@@ -230,8 +244,8 @@ export function BookingSummary() {
       {lastResult && lastResult.errors.length > 0 ? (
         <div className="border-danger/40 bg-danger/5 space-y-2 rounded-lg border p-3 text-sm">
           <p className="text-danger font-semibold">
-            {lastResult.room
-              ? "Some add-ons could not be booked:"
+            {lastResult.reservationId !== null
+              ? "Some items could not be booked:"
               : "Booking failed:"}
           </p>
           <ul className="space-y-1.5">

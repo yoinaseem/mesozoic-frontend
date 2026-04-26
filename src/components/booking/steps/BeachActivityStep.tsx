@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { StepNav } from "@/components/booking/StepNav";
 import { Input } from "@/components/ui/input";
 import { useBookingCart } from "@/context/booking-cart-context";
 import {
@@ -10,8 +11,8 @@ import {
 import type { BeachActivity, BeachActivitySchedule } from "@/types/booking";
 
 export function BeachActivityStep() {
-  const { cart, setBeachActivity, existingBookings } = useBookingCart();
-  const room = cart.room;
+  const { cart, setBeachActivity, existingBookings, primaryRoom, tripWindow } =
+    useBookingCart();
 
   const [activities, setActivities] = useState<BeachActivity[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(true);
@@ -26,7 +27,7 @@ export function BeachActivityStep() {
   );
 
   const [guests, setGuests] = useState<number>(
-    cart.beachActivity?.guests ?? cart.room?.guests ?? 1,
+    cart.beachActivity?.guests ?? primaryRoom?.guests ?? 1,
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -76,40 +77,48 @@ export function BeachActivityStep() {
   const bookableSchedules = useMemo(() => {
     return schedules.filter((s) => {
       if (s.status === "cancelled") return false;
-      if (room) {
-        if (s.activity_date < room.checkIn) return false;
-        if (s.activity_date >= room.checkOut) return false;
+      if (tripWindow) {
+        if (s.activity_date < tripWindow.checkIn) return false;
+        if (s.activity_date >= tripWindow.checkOut) return false;
       }
       return true;
     });
-  }, [schedules, room]);
+  }, [schedules, tripWindow]);
 
   const selectedActivity =
     activities.find((a) => a.id === selectedActivityId) ?? null;
   const selectedSchedule =
     schedules.find((s) => s.id === selectedScheduleId) ?? null;
 
-  const handleConfirm = () => {
+  const formIsTouched = selectedActivityId !== null;
+
+  const commitSelection = (): boolean => {
     setError(null);
     if (!selectedActivity || !selectedSchedule) {
       setError("Pick a beach activity and a schedule.");
-      return;
+      return false;
     }
     if (guests < 1) {
       setError("At least one guest is required.");
-      return;
+      return false;
     }
     if (guests > selectedActivity.capacity) {
       setError(
         `This activity accepts up to ${selectedActivity.capacity} guests per session.`,
       );
-      return;
+      return false;
     }
     setBeachActivity({
       activity: selectedActivity,
       schedule: selectedSchedule,
       guests,
     });
+    return true;
+  };
+
+  const handleNext = (): boolean => {
+    if (!formIsTouched && !cart.beachActivity) return true;
+    return commitSelection();
   };
 
   return (
@@ -230,20 +239,20 @@ export function BeachActivityStep() {
 
       {error ? <p className="text-sm text-danger">{error}</p> : null}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="button" className="btn-primary" onClick={handleConfirm}>
-          {cart.beachActivity ? "Update booking" : "Confirm booking"}
-        </button>
-        {cart.beachActivity ? (
-          <button
-            type="button"
-            className="text-sm font-semibold text-danger hover:opacity-80"
-            onClick={() => setBeachActivity(null)}
-          >
-            Clear booking
-          </button>
-        ) : null}
-      </div>
+      <StepNav
+        onNext={handleNext}
+        leadingActions={
+          cart.beachActivity ? (
+            <button
+              type="button"
+              className="text-sm font-semibold text-danger hover:opacity-80"
+              onClick={() => setBeachActivity(null)}
+            >
+              Clear booking
+            </button>
+          ) : null
+        }
+      />
     </section>
   );
 }

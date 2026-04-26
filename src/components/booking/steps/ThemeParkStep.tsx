@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { StepNav } from "@/components/booking/StepNav";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { useBookingCart } from "@/context/booking-cart-context";
@@ -36,10 +37,10 @@ function formatDateDdMmYyyy(date: string): string {
 }
 
 export function ThemeParkStep() {
-  const { cart, setParkTicket, existingBookings } = useBookingCart();
-  const room = cart.room;
-  const minVisitDate = room?.checkIn ?? todayIso();
-  const maxVisitDate = room ? previousDayIso(room.checkOut) : undefined;
+  const { cart, setParkTicket, existingBookings, primaryRoom, tripWindow } =
+    useBookingCart();
+  const minVisitDate = tripWindow?.checkIn ?? todayIso();
+  const maxVisitDate = tripWindow ? previousDayIso(tripWindow.checkOut) : undefined;
 
   const [parks, setParks] = useState<ThemePark[]>([]);
   const [loadingParks, setLoadingParks] = useState(true);
@@ -48,10 +49,10 @@ export function ThemeParkStep() {
   );
 
   const [visitDate, setVisitDate] = useState<string>(
-    cart.parkTicket?.visitDate ?? cart.room?.checkIn ?? todayIso(),
+    cart.parkTicket?.visitDate ?? tripWindow?.checkIn ?? todayIso(),
   );
   const [guests, setGuests] = useState<number>(
-    cart.parkTicket?.guests ?? cart.room?.guests ?? 1,
+    cart.parkTicket?.guests ?? primaryRoom?.guests ?? 1,
   );
 
   const [hours, setHours] = useState<EffectiveHour | null>(null);
@@ -103,43 +104,51 @@ export function ThemeParkStep() {
 
   const selectedPark = parks.find((p) => p.id === selectedParkId) ?? null;
 
-  const handleConfirm = () => {
+  const formIsTouched = selectedParkId !== null;
+
+  const commitSelection = (): boolean => {
     setError(null);
     if (!selectedPark) {
       setError("Pick a theme park.");
-      return;
+      return false;
     }
     if (!visitDate) {
       setError("Choose a visit date.");
-      return;
+      return false;
     }
     if (hours && hours.status === "closed") {
       setError("The park is closed on this date. Pick another day.");
-      return;
+      return false;
     }
-    if (room) {
-      if (visitDate < room.checkIn || visitDate >= room.checkOut) {
+    if (tripWindow) {
+      if (visitDate < tripWindow.checkIn || visitDate >= tripWindow.checkOut) {
         setError(
           "Visit date must fall on or after check-in and before check-out.",
         );
-        return;
+        return false;
       }
     }
     if (existingBookings.parkDates.has(`${selectedPark.id}|${visitDate}`)) {
       setError(
         "Your existing trip already has a day-pass for this park on this date.",
       );
-      return;
+      return false;
     }
     if (selectedPark.capacity !== null && guests > selectedPark.capacity) {
       setError(`Daily capacity is ${selectedPark.capacity} guests.`);
-      return;
+      return false;
     }
     if (guests < 1) {
       setError("At least one guest is required.");
-      return;
+      return false;
     }
     setParkTicket({ park: selectedPark, visitDate, guests });
+    return true;
+  };
+
+  const handleNext = (): boolean => {
+    if (!formIsTouched && !cart.parkTicket) return true;
+    return commitSelection();
   };
 
   return (
@@ -207,9 +216,9 @@ export function ThemeParkStep() {
             onChange={setVisitDate}
             placeholder="Select visit date"
           />
-          {room ? (
+          {tripWindow ? (
             <p className="text-muted mt-1 text-xs">
-              Within your stay: {room.checkIn} – {previousDayIso(room.checkOut)}{" "}
+              Within your stay: {tripWindow.checkIn} – {previousDayIso(tripWindow.checkOut)}{" "}
               (excludes check-out day).
             </p>
           ) : null}
@@ -251,20 +260,20 @@ export function ThemeParkStep() {
 
       {error ? <p className="text-sm text-danger">{error}</p> : null}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="button" className="btn-primary" onClick={handleConfirm}>
-          {cart.parkTicket ? "Update park ticket" : "Confirm park ticket"}
-        </button>
-        {cart.parkTicket ? (
-          <button
-            type="button"
-            className="text-sm font-semibold text-danger hover:opacity-80"
-            onClick={() => setParkTicket(null)}
-          >
-            Clear park ticket
-          </button>
-        ) : null}
-      </div>
+      <StepNav
+        onNext={handleNext}
+        leadingActions={
+          cart.parkTicket ? (
+            <button
+              type="button"
+              className="text-sm font-semibold text-danger hover:opacity-80"
+              onClick={() => setParkTicket(null)}
+            >
+              Clear park ticket
+            </button>
+          ) : null
+        }
+      />
     </section>
   );
 }

@@ -29,7 +29,7 @@ export function BookingStepper({ active, onChange }: BookingStepperProps) {
   const isDone = (step: BookingStep) => {
     switch (step) {
       case "room":
-        return cart.room !== null;
+        return cart.rooms.length > 0;
       case "ferry":
         return cart.ferry !== null;
       case "park-ticket":

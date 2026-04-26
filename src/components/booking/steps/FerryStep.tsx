@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { StepNav } from "@/components/booking/StepNav";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { useBookingCart } from "@/context/booking-cart-context";
@@ -8,8 +9,8 @@ import { listFerries, listFerrySchedules } from "@/lib/api/ferries";
 import type { Ferry, FerrySchedule } from "@/types/booking";
 
 export function FerryStep() {
-  const { cart, setFerry, existingBookings } = useBookingCart();
-  const room = cart.room;
+  const { cart, setFerry, existingBookings, primaryRoom, tripWindow } =
+    useBookingCart();
 
   const [ferries, setFerries] = useState<Ferry[]>([]);
   const [loadingFerries, setLoadingFerries] = useState(true);
@@ -24,11 +25,11 @@ export function FerryStep() {
   );
 
   const [travelDate, setTravelDate] = useState<string>(
-    cart.ferry?.travelDate ?? room?.checkIn ?? "",
+    cart.ferry?.travelDate ?? tripWindow?.checkIn ?? "",
   );
 
   const [passengers, setPassengers] = useState<number>(
-    cart.ferry?.passengers ?? room?.guests ?? 1,
+    cart.ferry?.passengers ?? primaryRoom?.guests ?? 1,
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -79,36 +80,42 @@ export function FerryStep() {
   const ferryCapacity = selectedFerry?.ferry_type?.capacity ?? 0;
 
   // Ferries use ferrySeatPoolOn — inclusive of both check-in and check-out.
-  const minTravelDate = room?.checkIn ?? new Date().toISOString().slice(0, 10);
-  const maxTravelDate = room?.checkOut ?? "";
+  const minTravelDate =
+    tripWindow?.checkIn ?? new Date().toISOString().slice(0, 10);
+  const maxTravelDate = tripWindow?.checkOut ?? "";
   const travelDateValid = useMemo(() => {
-    if (!travelDate || !room) return false;
-    return travelDate >= room.checkIn && travelDate <= room.checkOut;
-  }, [travelDate, room]);
+    if (!travelDate || !tripWindow) return false;
+    return travelDate >= tripWindow.checkIn && travelDate <= tripWindow.checkOut;
+  }, [travelDate, tripWindow]);
 
-  const handleConfirm = () => {
+  const formIsTouched =
+    selectedFerryId !== null ||
+    selectedScheduleId !== null ||
+    travelDate !== (tripWindow?.checkIn ?? "");
+
+  const commitSelection = (): boolean => {
     setError(null);
     if (!selectedFerry || !selectedSchedule) {
       setError("Pick a ferry and a scheduled departure.");
-      return;
+      return false;
     }
     if (!travelDate) {
       setError("Pick a travel date for the crossing.");
-      return;
+      return false;
     }
     if (!travelDateValid) {
       setError(
         "Travel date must fall on or between your check-in and check-out.",
       );
-      return;
+      return false;
     }
     if (passengers < 1) {
       setError("At least one passenger is required.");
-      return;
+      return false;
     }
     if (ferryCapacity > 0 && passengers > ferryCapacity) {
       setError(`This ferry carries up to ${ferryCapacity} passengers.`);
-      return;
+      return false;
     }
     if (
       existingBookings.ferryScheduleDates.has(
@@ -118,7 +125,7 @@ export function FerryStep() {
       setError(
         "Your existing trip already has a ferry on this slot for this date.",
       );
-      return;
+      return false;
     }
     setFerry({
       ferry: selectedFerry,
@@ -126,6 +133,13 @@ export function FerryStep() {
       travelDate,
       passengers,
     });
+    return true;
+  };
+
+  // Optional step — Next without form interaction just advances.
+  const handleNext = (): boolean => {
+    if (!formIsTouched && !cart.ferry) return true;
+    return commitSelection();
   };
 
   return (
@@ -255,9 +269,10 @@ export function FerryStep() {
             onChange={setTravelDate}
             placeholder="Select travel date"
           />
-          {room ? (
+          {tripWindow ? (
             <p className="text-muted mt-1 text-xs">
-              Within your stay: {room.checkIn} – {room.checkOut} (inclusive).
+              Within your stay: {tripWindow.checkIn} – {tripWindow.checkOut}{" "}
+              (inclusive).
             </p>
           ) : null}
         </div>
@@ -282,20 +297,20 @@ export function FerryStep() {
 
       {error ? <p className="text-sm text-danger">{error}</p> : null}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="button" className="btn-primary" onClick={handleConfirm}>
-          {cart.ferry ? "Update ferry booking" : "Confirm ferry booking"}
-        </button>
-        {cart.ferry ? (
-          <button
-            type="button"
-            className="text-sm font-semibold text-danger hover:opacity-80"
-            onClick={() => setFerry(null)}
-          >
-            Clear ferry booking
-          </button>
-        ) : null}
-      </div>
+      <StepNav
+        onNext={handleNext}
+        leadingActions={
+          cart.ferry ? (
+            <button
+              type="button"
+              className="text-sm font-semibold text-danger hover:opacity-80"
+              onClick={() => setFerry(null)}
+            >
+              Clear ferry booking
+            </button>
+          ) : null
+        }
+      />
     </section>
   );
 }

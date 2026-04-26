@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { StepNav } from "@/components/booking/StepNav";
 import { Input } from "@/components/ui/input";
 import { useBookingCart } from "@/context/booking-cart-context";
 import {
@@ -10,8 +11,8 @@ import {
 import type { ParkActivity, ParkActivitySchedule } from "@/types/booking";
 
 export function ParkActivityStep() {
-  const { cart, setParkActivity, existingBookings } = useBookingCart();
-  const room = cart.room;
+  const { cart, setParkActivity, existingBookings, tripWindow } =
+    useBookingCart();
   const cartParkTicket = cart.parkTicket;
   // When the user is anchored on an existing reservation that already has
   // a confirmed day-pass, derive the park + visit-date context from it so
@@ -90,20 +91,17 @@ export function ParkActivityStep() {
     };
   }, [effectiveParkId, selectedActivityId]);
 
-  // The day-pass coupling rule (§14): activity date must match the held
-  // park ticket's date. The room-window check is also enforced because the
-  // server re-validates seatPoolOn (exclusive checkout).
   const bookableSchedules = useMemo(() => {
     return schedules.filter((s) => {
       if (s.status !== "scheduled") return false;
       if (effectiveDate && s.date !== effectiveDate) return false;
-      if (room) {
-        if (s.date < room.checkIn) return false;
-        if (s.date >= room.checkOut) return false;
+      if (tripWindow) {
+        if (s.date < tripWindow.checkIn) return false;
+        if (s.date >= tripWindow.checkOut) return false;
       }
       return true;
     });
-  }, [schedules, effectiveDate, room]);
+  }, [schedules, effectiveDate, tripWindow]);
 
   const selectedActivity =
     activities.find((a) => a.id === selectedActivityId) ?? null;
@@ -112,11 +110,13 @@ export function ParkActivityStep() {
 
   const isAllDay = selectedActivity?.is_all_day === true;
 
-  const handleConfirm = () => {
+  const formIsTouched = selectedActivityId !== null;
+
+  const commitSelection = (): boolean => {
     setError(null);
     if (!selectedActivity) {
       setError("Pick an activity.");
-      return;
+      return false;
     }
     if (
       selectedActivity.max_capacity !== null &&
@@ -125,39 +125,41 @@ export function ParkActivityStep() {
       setError(
         `This activity accepts up to ${selectedActivity.max_capacity} guests per slot.`,
       );
-      return;
+      return false;
     }
     if (guests < 1) {
       setError("At least one guest is required.");
-      return;
+      return false;
     }
 
     if (isAllDay) {
-      // All-day flow: server materialises the schedule from (activity, date).
-      // Use the day-pass date as the booking date — that's the only date the
-      // user could plausibly mean for this trip, and it lines up with the
-      // (park, date) day-pass prerequisite the API enforces.
       if (!effectiveDate) {
         setError("Add a park ticket first so we know which date to book.");
-        return;
+        return false;
       }
       setParkActivity({
         activity: selectedActivity,
         date: effectiveDate,
         guests,
       });
-      return;
+      return true;
     }
 
     if (!selectedSchedule) {
       setError("Pick a scheduled time.");
-      return;
+      return false;
     }
     setParkActivity({
       activity: selectedActivity,
       schedule: selectedSchedule,
       guests,
     });
+    return true;
+  };
+
+  const handleNext = (): boolean => {
+    if (!formIsTouched && !cart.parkActivity) return true;
+    return commitSelection();
   };
 
   return (
@@ -310,20 +312,20 @@ export function ParkActivityStep() {
 
       {error ? <p className="text-sm text-danger">{error}</p> : null}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="button" className="btn-primary" onClick={handleConfirm}>
-          {cart.parkActivity ? "Update activity" : "Confirm activity"}
-        </button>
-        {cart.parkActivity ? (
-          <button
-            type="button"
-            className="text-sm font-semibold text-danger hover:opacity-80"
-            onClick={() => setParkActivity(null)}
-          >
-            Clear activity
-          </button>
-        ) : null}
-      </div>
+      <StepNav
+        onNext={handleNext}
+        leadingActions={
+          cart.parkActivity ? (
+            <button
+              type="button"
+              className="text-sm font-semibold text-danger hover:opacity-80"
+              onClick={() => setParkActivity(null)}
+            >
+              Clear activity
+            </button>
+          ) : null
+        }
+      />
     </section>
   );
 }
