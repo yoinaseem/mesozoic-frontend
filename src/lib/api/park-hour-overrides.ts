@@ -5,12 +5,14 @@ import type { ParkHourOverride } from "@/types/booking";
 type DataEnvelope<T> = { data: T };
 
 // Per API §9: both times set => "open with explicit hours". Both null =>
-// "closed that day". Partial (one set, one null) => 422.
+// "closed that day". Partial (one set, one null) => 422. DESD-95: same hybrid
+// cascade contract as opening hours via `on_conflict`.
 export type ParkHourOverrideInput = {
   date: string;
   open_time: string | null;
   close_time: string | null;
   note?: string | null;
+  on_conflict?: "reject" | "cascade";
 };
 
 export async function listParkHourOverrides(parkId: number, page = 1) {

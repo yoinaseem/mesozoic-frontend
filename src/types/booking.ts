@@ -83,13 +83,34 @@ export type BeachActivity = {
 
 export type BeachActivityScheduleStatus = "pending" | "confirmed" | "cancelled";
 
+// DESD-97 (Model B): `end_time` is now stored on the schedule row and is
+// NOT NULL. Mutating an activity's `duration` no longer shifts existing
+// schedules — `start_time`/`end_time` are canonical.
 export type BeachActivitySchedule = {
   id: number;
   beach_activity_id: number;
   activity_date: string;
   start_time: string;
+  end_time: string;
   status: BeachActivityScheduleStatus;
   activity?: BeachActivity;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BeachBookingStatus = "confirmed" | "cancelled";
+
+export type BeachBooking = {
+  id: number;
+  reservation_id: number;
+  beach_activity_schedule_id: number;
+  guests: number;
+  status: BeachBookingStatus;
+  price_per_guest: string;
+  total_price: string;
+  cancelled_at: string | null;
+  reservation?: ReservationSummary;
+  schedule?: BeachActivitySchedule;
   created_at: string;
   updated_at: string;
 };
@@ -141,13 +162,16 @@ export type ParkActivityScheduleStatus =
   | "cancelled"
   | "completed";
 
+// As of DESD-95: `start_time` and `end_time` are both NOT NULL on the
+// schedule row. `end_time_source` is retained for one release for backward
+// compatibility but is always `'explicit'` now.
 export type ParkActivitySchedule = {
   id: number;
   park_activity_id: number;
-  date: string | null;
-  start_time: string | null;
-  end_time: string | null;
-  end_time_source: "explicit" | "derived" | null;
+  date: string;
+  start_time: string;
+  end_time: string;
+  end_time_source: "explicit";
   status: ParkActivityScheduleStatus;
   notes: string | null;
   activity?: ParkActivity;

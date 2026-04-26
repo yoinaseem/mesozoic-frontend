@@ -8,6 +8,11 @@ export type ParkOpeningHourInput = {
   day: ParkOpeningDay;
   open_time: string;
   close_time: string;
+  // DESD-95: hybrid cascade. "reject" (default) returns 409 with conflict
+  // report when the change would invalidate live schedules; "cascade" applies
+  // the change and cancels affected schedules + bookings (or re-syncs all-day
+  // schedules whose date stays open).
+  on_conflict?: "reject" | "cascade";
 };
 
 export async function listParkOpeningHours(parkId: number, page = 1) {
@@ -41,9 +46,11 @@ export async function updateParkOpeningHour(
 export async function deleteParkOpeningHour(
   parkId: number,
   openingHourId: number,
+  onConflict?: "reject" | "cascade",
 ) {
+  const qs = onConflict ? `?on_conflict=${onConflict}` : "";
   return apiRequest<null>(
-    `/theme-parks/${parkId}/opening-hours/${openingHourId}`,
+    `/theme-parks/${parkId}/opening-hours/${openingHourId}${qs}`,
     { method: "DELETE" },
   );
 }

@@ -11,6 +11,7 @@ import { ParkDashboardHeader } from "@/components/admin/parks/ParkDashboardHeade
 import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { ApiError, toastApiError } from "@/lib/api-client";
+import { asBlockingBookings } from "@/lib/api/park-cascade";
 import { deleteThemePark, getThemePark } from "@/lib/api/theme-parks";
 import type { ThemePark } from "@/types/booking";
 
@@ -81,9 +82,19 @@ export default function ParkDashboardPage({
     if (!park) return;
     try {
       await deleteThemePark(park.id);
-      toast.success(`Deleted ${park.name}.`);
+      toast.success(`Archived ${park.name}.`);
       router.push("/admin/parks");
     } catch (err) {
+      // DESD-95: park DELETE returns 409 with `blocking_bookings` when
+      // upcoming confirmed bookings exist. Tell the operator how many and
+      // route them at the bookings pages.
+      const blocking = asBlockingBookings(err);
+      if (blocking) {
+        toast.error(
+          `Cannot archive — ${blocking.blocking_bookings} upcoming booking(s) reference this park. Cancel them first via Park bookings / Activity bookings.`,
+        );
+        throw err;
+      }
       toastApiError(err);
       throw err;
     }

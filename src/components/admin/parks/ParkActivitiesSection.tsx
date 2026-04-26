@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/table";
 import { useAuth } from "@/context/auth-context";
 import { toastApiError } from "@/lib/api-client";
-import { deleteParkActivity } from "@/lib/api/park-activities";
+import { cascadeDeleteParkActivity } from "@/lib/api/park-cascade-delete";
 import { cn } from "@/lib/utils";
 import type { ParkActivity, ThemePark } from "@/types/booking";
 
@@ -82,8 +82,18 @@ export function ParkActivitiesSection({
   const confirmDelete = async () => {
     if (!pendingDelete) return;
     try {
-      await deleteParkActivity(park.id, pendingDelete.id);
-      toast.success(`Deleted ${pendingDelete.name}.`);
+      // Cascade-delete: cancel every confirmed booking on every schedule,
+      // delete the schedules, then delete the activity. Single confirmation
+      // up front so the operator only gets one prompt.
+      const summary = await cascadeDeleteParkActivity(park.id, pendingDelete.id);
+      const parts = [`Deleted ${pendingDelete.name}`];
+      if (summary.bookings_cancelled > 0) {
+        parts.push(`${summary.bookings_cancelled} booking(s) cancelled`);
+      }
+      if (summary.schedules_deleted > 0) {
+        parts.push(`${summary.schedules_deleted} schedule(s) removed`);
+      }
+      toast.success(parts.join(" · "));
       setExpanded((prev) => {
         if (!prev.has(pendingDelete.id)) return prev;
         const next = new Set(prev);
@@ -251,11 +261,11 @@ export function ParkActivitiesSection({
         }}
         title={
           pendingDelete
-            ? `Delete ${pendingDelete.name}?`
-            : "Delete activity?"
+            ? `Are you sure you want to delete ${pendingDelete.name}?`
+            : "Are you sure you want to delete this park activity?"
         }
-        description="This will also delete all schedules under this activity. This cannot be undone."
-        confirmLabel="Delete"
+        description="All schedules under this activity and all bookings made for them will also be deleted. Please confirm before making this destructive action!"
+        confirmLabel="Delete activity & bookings"
         onConfirm={confirmDelete}
       />
     </div>

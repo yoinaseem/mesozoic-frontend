@@ -22,49 +22,46 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { Textarea } from "@/components/ui/textarea";
 import { TimePicker } from "@/components/ui/time-picker";
 import {
-  createParkActivitySchedule,
-  updateParkActivitySchedule,
-  type ParkActivityScheduleInput,
-} from "@/lib/api/park-activity-schedules";
+  createBeachActivitySchedule,
+  updateBeachActivitySchedule,
+  type BeachActivityScheduleInput,
+} from "@/lib/api/beach-activity-schedules";
 import type {
-  ParkActivitySchedule,
-  ParkActivityScheduleStatus,
+  BeachActivitySchedule,
+  BeachActivityScheduleStatus,
 } from "@/types/booking";
 
-export type ParkActivityScheduleDialogMode =
+export type BeachActivityScheduleDialogMode =
   | { kind: "create" }
-  | { kind: "edit"; schedule: ParkActivitySchedule };
+  | { kind: "edit"; schedule: BeachActivitySchedule };
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  parkId: number;
   activityId: number;
-  mode: ParkActivityScheduleDialogMode;
+  /** Pre-fill end_time as start_time + this duration in minutes when create. */
+  defaultDurationMinutes?: number | null;
+  mode: BeachActivityScheduleDialogMode;
   onSuccess: () => void;
 };
 
 type FormState = {
-  date: string;
+  activity_date: string;
   start_time: string;
   end_time: string;
-  status: ParkActivityScheduleStatus;
-  notes: string;
+  status: BeachActivityScheduleStatus;
 };
 
 function toTimeInput(value: string | null): string {
   if (!value) return "";
-  // API returns H:i:s — the HTML <input type=time> expects HH:mm (seconds
-  // optional). Trim to five chars so the control accepts it cleanly.
+  // API returns H:i:s; HTML/Picker UX wants HH:mm.
   return value.length >= 5 ? value.slice(0, 5) : value;
 }
 
 function toApiTime(value: string): string {
   const trimmed = value.trim();
-  // API accepts H:i:s — pad to include seconds if the user didn't.
   return trimmed.length === 5 ? `${trimmed}:00` : trimmed;
 }
 
@@ -76,32 +73,44 @@ function todayIso(): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+// Adds N minutes to "HH:mm" without crossing into a calendar overnight wrap.
+// Used only as a pre-fill convenience — the server is canonical for end_time
+// (Model B), and overnight schedules (end < start) are stored verbatim.
+function addMinutesToTime(time: string, minutes: number): string {
+  const [hStr, mStr] = time.split(":");
+  const h = Number(hStr);
+  const m = Number(mStr);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return "";
+  const total = (h * 60 + m + minutes) % (24 * 60);
+  const safe = total < 0 ? total + 24 * 60 : total;
+  const nextH = Math.floor(safe / 60);
+  const nextM = safe % 60;
+  return `${String(nextH).padStart(2, "0")}:${String(nextM).padStart(2, "0")}`;
+}
+
 function emptyState(): FormState {
   return {
-    date: "",
+    activity_date: "",
     start_time: "",
     end_time: "",
-    status: "scheduled",
-    notes: "",
+    status: "pending",
   };
 }
 
-// DESD-95: end_time is canonical and always present on read.
-function fromSchedule(schedule: ParkActivitySchedule): FormState {
+function fromSchedule(schedule: BeachActivitySchedule): FormState {
   return {
-    date: schedule.date,
+    activity_date: schedule.activity_date,
     start_time: toTimeInput(schedule.start_time),
     end_time: toTimeInput(schedule.end_time),
     status: schedule.status,
-    notes: schedule.notes ?? "",
   };
 }
 
-export function ParkActivityScheduleDialog({
+export function BeachActivityScheduleDialog({
   open,
   onOpenChange,
-  parkId,
   activityId,
+  defaultDurationMinutes,
   mode,
   onSuccess,
 }: Props) {
@@ -124,12 +133,32 @@ export function ParkActivityScheduleDialog({
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const buildPayload = (): ParkActivityScheduleInput => ({
-    date: form.date,
+  const handleStartChange = (next: string) => {
+    // Only auto-fill end_time on create when the operator hasn't touched it yet.
+    // Once they've picked an end manually, leave it alone.
+    setForm((prev) => {
+      if (
+        mode.kind === "create" &&
+        prev.end_time === "" &&
+        defaultDurationMinutes != null &&
+        defaultDurationMinutes > 0 &&
+        next !== ""
+      ) {
+        return {
+          ...prev,
+          start_time: next,
+          end_time: addMinutesToTime(next, defaultDurationMinutes),
+        };
+      }
+      return { ...prev, start_time: next };
+    });
+  };
+
+  const buildPayload = (): BeachActivityScheduleInput => ({
+    activity_date: form.activity_date,
     start_time: toApiTime(form.start_time),
     end_time: toApiTime(form.end_time),
     status: form.status,
-    notes: form.notes.trim() === "" ? null : form.notes,
   });
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -139,11 +168,10 @@ export function ParkActivityScheduleDialog({
 
     try {
       if (mode.kind === "create") {
-        await createParkActivitySchedule(parkId, activityId, buildPayload());
+        await createBeachActivitySchedule(activityId, buildPayload());
         toast.success("Schedule created.");
       } else {
-        await updateParkActivitySchedule(
-          parkId,
+        await updateBeachActivitySchedule(
           activityId,
           mode.schedule.id,
           buildPayload(),
@@ -165,15 +193,16 @@ export function ParkActivityScheduleDialog({
 
   const submitDisabled =
     submitting ||
-    form.date === "" ||
+    form.activity_date === "" ||
     form.start_time === "" ||
     form.end_time === "" ||
     sameStartEnd;
 
-  // DESD-95: schedule create rejects past dates. Only constrain create — on
-  // edit, status/notes tweaks on past schedules remain allowed (server only
-  // blocks moving the date itself to the past).
-  const minDate = mode.kind === "create" ? todayIso() : undefined;
+  // DESD-97: schedule create rejects past dates. On edit the date can be
+  // moved but only to today/future; status-only updates on past schedules
+  // remain allowed when the date field is omitted, so we still constrain
+  // both modes to today+ on the picker side.
+  const minDate = todayIso();
 
   return (
     <Dialog
@@ -188,10 +217,15 @@ export function ParkActivityScheduleDialog({
             </DialogTitle>
           </DialogHeader>
 
-          <FormField label="Date" name="date" errors={fieldErrors} required>
+          <FormField
+            label="Date"
+            name="activity_date"
+            errors={fieldErrors}
+            required
+          >
             <DatePicker
-              value={form.date}
-              onChange={(next) => setField("date", next)}
+              value={form.activity_date}
+              onChange={(next) => setField("activity_date", next)}
               min={minDate}
             />
           </FormField>
@@ -205,7 +239,7 @@ export function ParkActivityScheduleDialog({
             >
               <TimePicker
                 value={form.start_time}
-                onChange={(next) => setField("start_time", next)}
+                onChange={handleStartChange}
               />
             </FormField>
 
@@ -214,7 +248,7 @@ export function ParkActivityScheduleDialog({
               name="end_time"
               errors={fieldErrors}
               required
-              helper="Must fit inside park hours; overnight (end before start) is OK."
+              helper="Overnight (end before start) is stored verbatim."
             >
               <TimePicker
                 value={form.end_time}
@@ -233,27 +267,18 @@ export function ParkActivityScheduleDialog({
             <Select
               value={form.status}
               onValueChange={(next) =>
-                setField("status", next as ParkActivityScheduleStatus)
+                setField("status", next as BeachActivityScheduleStatus)
               }
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="scheduled">Scheduled</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="confirmed">Confirmed</SelectItem>
                 <SelectItem value="cancelled">Cancelled</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
               </SelectContent>
             </Select>
-          </FormField>
-
-          <FormField label="Notes" name="notes" errors={fieldErrors}>
-            <Textarea
-              rows={2}
-              placeholder="Optional internal notes"
-              value={form.notes}
-              onChange={(event) => setField("notes", event.target.value)}
-            />
           </FormField>
 
           {formError ? (

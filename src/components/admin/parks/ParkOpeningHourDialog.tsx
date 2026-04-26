@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
 import { FormField } from "@/components/admin/FormField";
+import { HoursCascadeDialog } from "@/components/admin/parks/HoursCascadeDialog";
 import { useFieldErrors } from "@/components/admin/useFieldErrors";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +14,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  asHoursCascadeConflict,
+  type HoursCascadeResponse,
+} from "@/lib/api/park-cascade";
 import {
   Select,
   SelectContent,
@@ -73,6 +78,7 @@ export function ParkOpeningHourDialog({
   const [openTime, setOpenTime] = useState("");
   const [closeTime, setCloseTime] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [conflict, setConflict] = useState<HoursCascadeResponse | null>(null);
 
   const { formError, fieldErrors, reset, setFromApiError } = useFieldErrors();
 
@@ -90,25 +96,59 @@ export function ParkOpeningHourDialog({
     }
   }, [open, mode, reset]);
 
+  // DESD-95: hour mutations may return 409 with a conflict report when the
+  // new window invalidates live schedules. The dialog shows the report and
+  // re-runs the mutation with `on_conflict: "cascade"` if the operator
+  // accepts.
+  const submit = async (onConflict: "reject" | "cascade") => {
+    const payload: ParkOpeningHourInput = {
+      day,
+      open_time: toApiTime(openTime),
+      close_time: toApiTime(closeTime),
+      on_conflict: onConflict,
+    };
+    if (mode.kind === "create") {
+      await createParkOpeningHour(parkId, payload);
+    } else {
+      await updateParkOpeningHour(parkId, mode.openingHour.id, payload);
+    }
+  };
+
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     reset();
     setSubmitting(true);
 
-    const payload: ParkOpeningHourInput = {
-      day,
-      open_time: toApiTime(openTime),
-      close_time: toApiTime(closeTime),
-    };
-
     try {
-      if (mode.kind === "create") {
-        await createParkOpeningHour(parkId, payload);
-        toast.success(`Set hours for ${day}.`);
+      await submit("reject");
+      toast.success(
+        mode.kind === "create"
+          ? `Set hours for ${day}.`
+          : `Updated hours for ${day}.`,
+      );
+      onSuccess();
+    } catch (error) {
+      const cascade = asHoursCascadeConflict(error);
+      if (cascade) {
+        setConflict(cascade);
       } else {
-        await updateParkOpeningHour(parkId, mode.openingHour.id, payload);
-        toast.success(`Updated hours for ${day}.`);
+        setFromApiError(error);
       }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCascadeConfirm = async () => {
+    setSubmitting(true);
+    try {
+      await submit("cascade");
+      toast.success(
+        mode.kind === "create"
+          ? `Set hours for ${day} (with cascade).`
+          : `Updated hours for ${day} (with cascade).`,
+      );
+      setConflict(null);
       onSuccess();
     } catch (error) {
       setFromApiError(error);
@@ -203,6 +243,15 @@ export function ParkOpeningHourDialog({
           </DialogFooter>
         </form>
       </DialogContent>
+
+      <HoursCascadeDialog
+        open={conflict !== null}
+        onOpenChange={(next) => {
+          if (!next) setConflict(null);
+        }}
+        conflict={conflict}
+        onConfirm={handleCascadeConfirm}
+      />
     </Dialog>
   );
 }

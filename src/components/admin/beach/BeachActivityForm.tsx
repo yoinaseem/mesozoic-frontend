@@ -7,57 +7,44 @@ import { toast } from "sonner";
 import { FormField } from "@/components/admin/FormField";
 import { FormPage } from "@/components/admin/FormPage";
 import { useFieldErrors } from "@/components/admin/useFieldErrors";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  createParkActivity,
-  updateParkActivity,
-  type ParkActivityInput,
-} from "@/lib/api/park-activities";
-import type { ParkActivity } from "@/types/booking";
+  createBeachActivity,
+  updateBeachActivity,
+  type BeachActivityInput,
+} from "@/lib/api/beach-activities";
+import type { BeachActivity } from "@/types/booking";
 
-type ParkActivityFormMode =
+type BeachActivityFormMode =
   | { kind: "create"; initial?: undefined }
-  | { kind: "edit"; initial: ParkActivity };
+  | { kind: "edit"; initial: BeachActivity };
 
-type ParkActivityFormProps = {
-  parkId: number;
-  // DESD-95: `max_capacity` must be ≤ park.capacity. Pass the park's cap in
-  // so the form can both `max=` the input and surface a friendly message
-  // before the round-trip.
-  parkCapacity?: number | null;
-  mode: ParkActivityFormMode;
+type BeachActivityFormProps = {
+  mode: BeachActivityFormMode;
 };
 
 type FormState = {
   name: string;
   description: string;
   price: string;
-  image: string;
+  capacity: string;
   duration: string;
-  max_capacity: string;
-  is_all_day: boolean;
+  image: string;
 };
 
-function buildInitialState(initial?: ParkActivity): FormState {
+function buildInitialState(initial?: BeachActivity): FormState {
   return {
     name: initial?.name ?? "",
     description: initial?.description ?? "",
     price: initial?.price != null ? String(initial.price) : "",
-    image: initial?.image ?? "",
+    capacity: initial?.capacity != null ? String(initial.capacity) : "",
     duration: initial?.duration != null ? String(initial.duration) : "",
-    max_capacity:
-      initial?.max_capacity != null ? String(initial.max_capacity) : "",
-    is_all_day: initial?.is_all_day ?? false,
+    image: initial?.image ?? "",
   };
 }
 
-export function ParkActivityForm({
-  parkId,
-  parkCapacity,
-  mode,
-}: ParkActivityFormProps) {
+export function BeachActivityForm({ mode }: BeachActivityFormProps) {
   const router = useRouter();
   const snapshot = useMemo(
     () => buildInitialState(mode.initial),
@@ -73,54 +60,37 @@ export function ParkActivityForm({
     form.name !== snapshot.name ||
     form.description !== snapshot.description ||
     form.price !== snapshot.price ||
-    form.image !== snapshot.image ||
+    form.capacity !== snapshot.capacity ||
     form.duration !== snapshot.duration ||
-    form.max_capacity !== snapshot.max_capacity ||
-    form.is_all_day !== snapshot.is_all_day;
+    form.image !== snapshot.image;
 
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  // When the activity is all-day, server forces duration to null — so we
-  // stop sending it and clear the input to keep the two in sync client-side.
-  const isAllDay = form.is_all_day;
-
-  const buildPayload = (): ParkActivityInput => ({
+  const buildPayload = (): BeachActivityInput => ({
     name: form.name,
     description: form.description || null,
     price: Number(form.price),
+    capacity: Number(form.capacity),
+    duration: Number(form.duration),
     image: form.image || null,
-    duration: isAllDay
-      ? null
-      : form.duration === ""
-        ? null
-        : Number(form.duration),
-    max_capacity: Number(form.max_capacity),
-    is_all_day: isAllDay,
   });
 
-  const buildDiff = (): Partial<ParkActivityInput> => {
-    const diff: Partial<ParkActivityInput> = {};
+  const buildDiff = (): Partial<BeachActivityInput> => {
+    const diff: Partial<BeachActivityInput> = {};
     if (form.name !== snapshot.name) diff.name = form.name;
     if (form.description !== snapshot.description) {
       diff.description = form.description || null;
     }
     if (form.price !== snapshot.price) diff.price = Number(form.price);
+    if (form.capacity !== snapshot.capacity) {
+      diff.capacity = Number(form.capacity);
+    }
+    if (form.duration !== snapshot.duration) {
+      diff.duration = Number(form.duration);
+    }
     if (form.image !== snapshot.image) diff.image = form.image || null;
-    if (form.is_all_day !== snapshot.is_all_day) {
-      diff.is_all_day = form.is_all_day;
-    }
-    if (form.duration !== snapshot.duration || isAllDay !== snapshot.is_all_day) {
-      diff.duration = isAllDay
-        ? null
-        : form.duration === ""
-          ? null
-          : Number(form.duration);
-    }
-    if (form.max_capacity !== snapshot.max_capacity) {
-      diff.max_capacity = Number(form.max_capacity);
-    }
     return diff;
   };
 
@@ -131,13 +101,14 @@ export function ParkActivityForm({
 
     try {
       if (mode.kind === "create") {
-        await createParkActivity(parkId, buildPayload());
-        toast.success(`Created ${form.name}.`);
+        const res = await createBeachActivity(buildPayload());
+        toast.success(`Created ${res.data.name}.`);
+        router.push(`/admin/beach-activities/${res.data.id}`);
       } else {
-        await updateParkActivity(parkId, mode.initial.id, buildDiff());
-        toast.success(`Updated ${form.name}.`);
+        const res = await updateBeachActivity(mode.initial.id, buildDiff());
+        toast.success(`Updated ${res.data.name}.`);
+        router.push(`/admin/beach-activities/${mode.initial.id}`);
       }
-      router.push(`/admin/parks/${parkId}`);
     } catch (error) {
       setFromApiError(error);
     } finally {
@@ -149,10 +120,10 @@ export function ParkActivityForm({
 
   return (
     <FormPage
-      title={isCreate ? "New activity" : `Edit ${mode.initial.name}`}
+      title={isCreate ? "New beach activity" : `Edit ${mode.initial.name}`}
       description={
         isCreate
-          ? "Add a new activity to this park."
+          ? "Add a new beach activity to the catalogue."
           : "Update this activity's details."
       }
       submitLabel={
@@ -168,13 +139,19 @@ export function ParkActivityForm({
       isSubmitting={submitting}
       formError={formError}
       onSubmit={onSubmit}
-      onCancel={() => router.push(`/admin/parks/${parkId}`)}
+      onCancel={() =>
+        router.push(
+          isCreate
+            ? "/admin/beach-activities"
+            : `/admin/beach-activities/${mode.initial.id}`,
+        )
+      }
     >
       <FormField label="Name" name="name" errors={fieldErrors} required>
         <Input
           type="text"
           required
-          placeholder="Jurassic River Rafting"
+          placeholder="Sunset Snorkel"
           value={form.name}
           onChange={(event) => setField("name", event.target.value)}
         />
@@ -183,7 +160,7 @@ export function ParkActivityForm({
       <FormField label="Description" name="description" errors={fieldErrors}>
         <Textarea
           rows={3}
-          placeholder="A brief description of the activity."
+          placeholder="A brief description of this activity."
           value={form.description}
           onChange={(event) => setField("description", event.target.value)}
         />
@@ -209,58 +186,39 @@ export function ParkActivityForm({
         </FormField>
 
         <FormField
-          label="Max capacity"
-          name="max_capacity"
+          label="Capacity"
+          name="capacity"
           errors={fieldErrors}
-          helper={
-            parkCapacity != null
-              ? `Concurrent guests per session (≤ park capacity of ${parkCapacity})`
-              : "Concurrent guests per session"
-          }
+          helper="Max guests per session"
           required
         >
           <Input
             type="number"
             min={1}
-            max={parkCapacity ?? undefined}
             required
             inputMode="numeric"
-            value={form.max_capacity}
-            onChange={(event) => setField("max_capacity", event.target.value)}
+            value={form.capacity}
+            onChange={(event) => setField("capacity", event.target.value)}
           />
         </FormField>
       </div>
 
-      <FormField label="All-day activity" name="is_all_day" errors={fieldErrors}>
-        <label className="flex items-center gap-2 text-sm">
-          <Checkbox
-            checked={form.is_all_day}
-            onCheckedChange={(value) =>
-              setField("is_all_day", value === true)
-            }
-          />
-          <span>Runs for the whole park day (no fixed duration)</span>
-        </label>
-      </FormField>
-
-      {!isAllDay ? (
-        <FormField
-          label="Duration"
-          name="duration"
-          errors={fieldErrors}
-          helper="In minutes. Required for timed activities."
+      <FormField
+        label="Duration"
+        name="duration"
+        errors={fieldErrors}
+        helper="In minutes. UI default for new schedules; existing schedules keep their stored end time."
+        required
+      >
+        <Input
+          type="number"
+          min={1}
           required
-        >
-          <Input
-            type="number"
-            min={1}
-            required
-            inputMode="numeric"
-            value={form.duration}
-            onChange={(event) => setField("duration", event.target.value)}
-          />
-        </FormField>
-      ) : null}
+          inputMode="numeric"
+          value={form.duration}
+          onChange={(event) => setField("duration", event.target.value)}
+        />
+      </FormField>
 
       <FormField
         label="Image URL"

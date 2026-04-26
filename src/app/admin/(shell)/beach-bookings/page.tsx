@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/admin/EmptyState";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { RowActions, type RowActionItem } from "@/components/admin/RowActions";
 import { StatusBadge } from "@/components/admin/StatusBadge";
-import { ParkBookingEditDialog } from "@/components/admin/park-bookings/ParkBookingEditDialog";
+import { BeachBookingEditDialog } from "@/components/admin/beach-bookings/BeachBookingEditDialog";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
@@ -22,16 +22,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ApiError, toastApiError } from "@/lib/api-client";
-import { asBlockingBookings } from "@/lib/api/park-cascade";
 import {
-  cancelParkBooking,
-  listParkBookings,
-  type ParkBookingFilters,
-} from "@/lib/api/park-bookings";
+  cancelBeachBooking,
+  listBeachBookings,
+  type BeachBookingFilters,
+} from "@/lib/api/beach-bookings";
 import type { Paginated } from "@/types/auth";
-import type { ParkBooking, ParkBookingStatus } from "@/types/booking";
+import type { BeachBooking, BeachBookingStatus } from "@/types/booking";
 
-function statusBadge(status: ParkBookingStatus) {
+function statusBadge(status: BeachBookingStatus) {
   if (status === "confirmed")
     return <StatusBadge variant="success">Confirmed</StatusBadge>;
   return <StatusBadge variant="destructive">Cancelled</StatusBadge>;
@@ -46,28 +45,33 @@ function formatMoney(value: string): string {
   }).format(n);
 }
 
-type StatusFilter = "all" | ParkBookingStatus;
+function formatTime(time: string | null | undefined): string {
+  if (!time) return "—";
+  return time.length >= 5 ? time.slice(0, 5) : time;
+}
 
-export default function ParkBookingsPage() {
+type StatusFilter = "all" | BeachBookingStatus;
+
+export default function BeachBookingsPage() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<StatusFilter>("all");
   const [date, setDate] = useState("");
 
-  const [result, setResult] = useState<Paginated<ParkBooking> | null>(null);
+  const [result, setResult] = useState<Paginated<BeachBooking> | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const [editing, setEditing] = useState<ParkBooking | null>(null);
-  const [pendingCancel, setPendingCancel] = useState<ParkBooking | null>(null);
+  const [editing, setEditing] = useState<BeachBooking | null>(null);
+  const [pendingCancel, setPendingCancel] = useState<BeachBooking | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setErrorMessage("");
     try {
-      const filters: ParkBookingFilters = { page };
+      const filters: BeachBookingFilters = { page };
       if (status !== "all") filters.status = status;
       if (date) filters.date = date;
-      const data = await listParkBookings(filters);
+      const data = await listBeachBookings(filters);
       setResult(data);
     } catch (error) {
       if (error instanceof ApiError || error instanceof Error) {
@@ -100,7 +104,7 @@ export default function ParkBookingsPage() {
         ? "empty"
         : "ready";
 
-  const columns: DataTableColumn<ParkBooking>[] = [
+  const columns: DataTableColumn<BeachBooking>[] = [
     {
       key: "id",
       header: "ID",
@@ -112,22 +116,37 @@ export default function ParkBookingsPage() {
       className: "w-20",
     },
     {
-      key: "park",
-      header: "Park",
+      key: "activity",
+      header: "Activity",
       cell: (booking) => (
         <div className="flex flex-col">
-          <span className="font-medium">{booking.park?.name ?? "—"}</span>
+          <span className="font-medium">
+            {booking.schedule?.activity?.name ?? "—"}
+          </span>
           <span className="text-xs text-muted-foreground">
-            Park #{booking.park_id}
+            Schedule #{booking.beach_activity_schedule_id}
           </span>
         </div>
       ),
     },
     {
-      key: "date",
-      header: "Date",
-      cell: (booking) => booking.date,
-      className: "w-32",
+      key: "when",
+      header: "Date / Time",
+      cell: (booking) => {
+        const schedule = booking.schedule;
+        return (
+          <div className="flex flex-col">
+            <span>{schedule?.activity_date ?? "—"}</span>
+            <span className="text-xs text-muted-foreground">
+              {formatTime(schedule?.start_time)}
+              {schedule?.end_time
+                ? `–${formatTime(schedule.end_time)}`
+                : null}
+            </span>
+          </div>
+        );
+      },
+      className: "w-40",
     },
     {
       key: "reservation",
@@ -193,28 +212,19 @@ export default function ParkBookingsPage() {
       title={
         status !== "all" || date
           ? "No bookings match these filters"
-          : "No park day-pass bookings yet"
+          : "No beach bookings yet"
       }
-      description="Day-pass bookings will appear here once customers reserve them."
+      description="Beach bookings will appear here once customers reserve them."
     />
   );
 
   const confirmCancel = async () => {
     if (!pendingCancel) return;
     try {
-      await cancelParkBooking(pendingCancel.id);
+      await cancelBeachBooking(pendingCancel.id);
       toast.success(`Cancelled booking #${pendingCancel.id}.`);
       await load();
     } catch (error) {
-      // DESD-95: cancel is blocked when activity bookings depend on the
-      // day-pass for that date.
-      const blocking = asBlockingBookings(error);
-      if (blocking) {
-        toast.error(
-          `Cannot cancel — ${blocking.blocking_bookings} activity booking(s) depend on this day-pass. Cancel them first via Activity bookings.`,
-        );
-        throw error;
-      }
       toastApiError(error);
       throw error;
     }
@@ -225,18 +235,18 @@ export default function ParkBookingsPage() {
       <Breadcrumbs
         items={[
           { label: "Dashboard", href: "/admin/dashboard" },
-          { label: "Park bookings" },
+          { label: "Beach bookings" },
         ]}
       />
       <PageHeader
-        title="Park bookings"
-        description="View, update, and cancel park day-pass admission tickets."
+        title="Beach bookings"
+        description="View, update, and cancel beach activity session tickets."
       />
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1">
           <label
-            htmlFor="park-booking-status"
+            htmlFor="beach-booking-status"
             className="block text-xs font-medium text-muted-foreground"
           >
             Status
@@ -245,7 +255,7 @@ export default function ParkBookingsPage() {
             value={status}
             onValueChange={(next) => setStatus(next as StatusFilter)}
           >
-            <SelectTrigger id="park-booking-status" className="w-36">
+            <SelectTrigger id="beach-booking-status" className="w-36">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -258,13 +268,13 @@ export default function ParkBookingsPage() {
 
         <div className="space-y-1">
           <label
-            htmlFor="park-booking-date"
+            htmlFor="beach-booking-date"
             className="block text-xs font-medium text-muted-foreground"
           >
             Date
           </label>
           <DatePicker
-            id="park-booking-date"
+            id="beach-booking-date"
             value={date}
             onChange={setDate}
             className="w-48"
@@ -285,7 +295,7 @@ export default function ParkBookingsPage() {
         ) : null}
       </div>
 
-      <DataTable<ParkBooking>
+      <DataTable<BeachBooking>
         columns={columns}
         rows={rows}
         state={state}
@@ -322,7 +332,7 @@ export default function ParkBookingsPage() {
         }
       />
 
-      <ParkBookingEditDialog
+      <BeachBookingEditDialog
         open={editing !== null}
         onOpenChange={(open) => {
           if (!open) setEditing(null);

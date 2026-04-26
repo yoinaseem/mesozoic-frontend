@@ -11,7 +11,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/context/auth-context";
 import { ApiError, toastApiError } from "@/lib/api-client";
 import { listParkActivitySchedules } from "@/lib/api/theme-parks";
-import { deleteParkActivitySchedule } from "@/lib/api/park-activity-schedules";
+import { cascadeDeleteParkActivitySchedule } from "@/lib/api/park-cascade-delete";
 import type {
   ParkActivity,
   ParkActivitySchedule,
@@ -98,12 +98,18 @@ export function ParkActivitySchedulesPanel({
   const confirmDelete = async () => {
     if (!pendingDelete) return;
     try {
-      await deleteParkActivitySchedule(
+      // Cascade-delete: cancel every confirmed booking on this schedule,
+      // then delete the schedule itself. One operator prompt up front.
+      const summary = await cascadeDeleteParkActivitySchedule(
         parkId,
         activity.id,
         pendingDelete.id,
       );
-      toast.success("Deleted schedule.");
+      const parts = ["Schedule deleted"];
+      if (summary.bookings_cancelled > 0) {
+        parts.push(`${summary.bookings_cancelled} booking(s) cancelled`);
+      }
+      toast.success(parts.join(" · "));
       await load();
       onChanged();
     } catch (error) {
@@ -118,13 +124,19 @@ export function ParkActivitySchedulesPanel({
     onChanged();
   };
 
+  // DESD-95: all-day activities don't take manually-authored schedules — the
+  // booking flow lazily materializes a per-date schedule on first booking
+  // whose window mirrors that date's effective hours. Hide the New-schedule
+  // affordance and surface why.
+  const isAllDay = activity.is_all_day;
+
   return (
     <div className="flex flex-col gap-3 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium text-muted-foreground">
           {activity.name} Schedules
         </p>
-        {canCreate ? (
+        {canCreate && !isAllDay ? (
           <Button
             size="sm"
             variant="outline"
@@ -136,6 +148,14 @@ export function ParkActivitySchedulesPanel({
         ) : null}
       </div>
 
+      {isAllDay ? (
+        <p className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+          This is an all-day activity. Schedules are created automatically when
+          a customer books a date — their window mirrors that day&apos;s
+          effective park hours.
+        </p>
+      ) : null}
+
       {loading ? (
         <div className="flex justify-center py-6">
           <Spinner className="size-5" />
@@ -144,15 +164,18 @@ export function ParkActivitySchedulesPanel({
         <p className="text-sm text-destructive">{loadError}</p>
       ) : !schedules || schedules.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No schedules for this activity yet.
-          {canCreate ? " Use “New schedule” to add one." : ""}
+          {isAllDay
+            ? "No bookings yet — schedules will appear here once customers book this activity."
+            : `No schedules for this activity yet.${
+                canCreate ? " Use “New schedule” to add one." : ""
+              }`}
         </p>
       ) : (
         <div className="overflow-hidden rounded-lg border bg-background">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40 text-left text-xs font-medium text-muted-foreground">
-                {showIds ? <th className="w-[5rem] px-3 py-2">ID</th> : null}
+                {showIds ? <th className="w-20 px-3 py-2">ID</th> : null}
                 <th className="px-3 py-2">Date</th>
                 <th className="px-3 py-2">Start</th>
                 <th className="px-3 py-2">End</th>
@@ -170,22 +193,12 @@ export function ParkActivitySchedulesPanel({
                       {schedule.id}
                     </td>
                   ) : null}
-                  <td className="px-3 py-2 font-medium">
-                    {schedule.date ?? "—"}
-                  </td>
+                  <td className="px-3 py-2 font-medium">{schedule.date}</td>
                   <td className="px-3 py-2">
                     {formatTime(schedule.start_time)}
                   </td>
                   <td className="px-3 py-2">
-                    <span>{formatTime(schedule.end_time)}</span>
-                    {schedule.end_time_source === "derived" ? (
-                      <span
-                        className="ml-1 text-xs text-muted-foreground"
-                        title="Derived from activity duration"
-                      >
-                        (auto)
-                      </span>
-                    ) : null}
+                    {formatTime(schedule.end_time)}
                   </td>
                   <td className="px-3 py-2">{scheduleBadge(schedule.status)}</td>
                   <td className="px-3 py-2 text-right">
@@ -240,9 +253,13 @@ export function ParkActivitySchedulesPanel({
         onOpenChange={(open) => {
           if (!open) setPendingDelete(null);
         }}
-        title="Delete schedule?"
-        description="Existing bookings on this schedule will be orphaned. This cannot be undone."
-        confirmLabel="Delete"
+        title={
+          pendingDelete
+            ? `Are you sure you want to delete this activity schedule (${pendingDelete.date} · ${formatTime(pendingDelete.start_time)})?`
+            : "Are you sure you want to delete this activity schedule?"
+        }
+        description="All bookings made for this schedule will also be deleted. Please confirm before making this destructive action!"
+        confirmLabel="Delete schedule & bookings"
         onConfirm={confirmDelete}
       />
     </div>

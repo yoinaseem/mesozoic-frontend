@@ -4,42 +4,42 @@ import { use, useEffect, useState } from "react";
 
 import { Breadcrumbs } from "@/components/admin/Breadcrumbs";
 import { PermissionGate } from "@/components/auth/permission-gate";
-import { ParkActivityForm } from "@/components/admin/parks/ParkActivityForm";
+import { BeachActivityForm } from "@/components/admin/beach/BeachActivityForm";
 import { Spinner } from "@/components/ui/spinner";
 import { ApiError } from "@/lib/api-client";
-import { getThemePark } from "@/lib/api/theme-parks";
-import type { ThemePark } from "@/types/booking";
+import { getBeachActivity } from "@/lib/api/beach-activities";
+import type { BeachActivity } from "@/types/booking";
 
-export default function NewParkActivityPage({
+export default function EditBeachActivityPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const parkId = Number(id);
-  const invalidParkId = Number.isNaN(parkId);
+  const activityId = Number(id);
+  const invalidId = Number.isNaN(activityId);
 
-  const [park, setPark] = useState<ThemePark | null>(null);
-  const [loading, setLoading] = useState(!invalidParkId);
+  const [activity, setActivity] = useState<BeachActivity | null>(null);
+  const [loading, setLoading] = useState(!invalidId);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (invalidParkId) return;
+    if (invalidId) return;
     let cancelled = false;
 
-    getThemePark(parkId)
+    getBeachActivity(activityId)
       .then((res) => {
         if (cancelled) return;
-        setPark(res.data);
+        setActivity(res.data);
         setError("");
         setLoading(false);
       })
       .catch((err) => {
         if (cancelled) return;
         if (err instanceof ApiError || err instanceof Error) {
-          setError(err.message || "Failed to load park.");
+          setError(err.message || "Failed to load activity.");
         } else {
-          setError("Failed to load park.");
+          setError("Failed to load activity.");
         }
         setLoading(false);
       });
@@ -47,12 +47,12 @@ export default function NewParkActivityPage({
     return () => {
       cancelled = true;
     };
-  }, [parkId, invalidParkId]);
+  }, [activityId, invalidId]);
 
-  if (invalidParkId) {
+  if (invalidId) {
     return (
       <p className="py-20 text-center text-sm text-destructive">
-        Invalid park id.
+        Invalid activity id.
       </p>
     );
   }
@@ -71,30 +71,29 @@ export default function NewParkActivityPage({
     );
   }
 
-  if (!park) {
+  if (!activity) {
     return (
       <p className="py-20 text-center text-sm text-muted-foreground">
-        Park not found.
+        Activity not found.
       </p>
     );
   }
 
   return (
-    <PermissionGate permission="park.create">
+    <PermissionGate permission="beach.update">
       <div className="flex flex-1 flex-col gap-4">
         <Breadcrumbs
           items={[
             { label: "Dashboard", href: "/admin/dashboard" },
-            { label: "Parks", href: "/admin/parks" },
-            { label: park.name, href: `/admin/parks/${parkId}` },
-            { label: "New activity" },
+            { label: "Beach activities", href: "/admin/beach-activities" },
+            {
+              label: activity.name,
+              href: `/admin/beach-activities/${activity.id}`,
+            },
+            { label: "Edit" },
           ]}
         />
-        <ParkActivityForm
-          parkId={parkId}
-          parkCapacity={park.capacity}
-          mode={{ kind: "create" }}
-        />
+        <BeachActivityForm mode={{ kind: "edit", initial: activity }} />
       </div>
     </PermissionGate>
   );

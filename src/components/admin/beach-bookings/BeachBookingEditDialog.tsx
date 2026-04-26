@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { FormField } from "@/components/admin/FormField";
 import { useFieldErrors } from "@/components/admin/useFieldErrors";
 import { Button } from "@/components/ui/button";
-import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
   DialogContent,
@@ -23,28 +22,26 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { asBlockingBookings } from "@/lib/api/park-cascade";
 import {
-  updateParkBooking,
-  type ParkBookingUpdateInput,
-} from "@/lib/api/park-bookings";
-import type { ParkBooking, ParkBookingStatus } from "@/types/booking";
+  updateBeachBooking,
+  type BeachBookingUpdateInput,
+} from "@/lib/api/beach-bookings";
+import type { BeachBooking, BeachBookingStatus } from "@/types/booking";
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  booking: ParkBooking | null;
+  booking: BeachBooking | null;
   onSuccess: () => void;
 };
 
-export function ParkBookingEditDialog({
+export function BeachBookingEditDialog({
   open,
   onOpenChange,
   booking,
   onSuccess,
 }: Props) {
-  const [status, setStatus] = useState<ParkBookingStatus>("confirmed");
-  const [date, setDate] = useState("");
+  const [status, setStatus] = useState<BeachBookingStatus>("confirmed");
   const [guests, setGuests] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -53,7 +50,6 @@ export function ParkBookingEditDialog({
   useEffect(() => {
     if (open && booking) {
       setStatus(booking.status);
-      setDate(booking.date);
       setGuests(String(booking.guests));
       reset();
     }
@@ -65,11 +61,11 @@ export function ParkBookingEditDialog({
     reset();
     setSubmitting(true);
 
-    // Diff-only payload — keeps server's date/guests re-validation tight and
-    // avoids no-op writes.
-    const diff: ParkBookingUpdateInput = {};
+    // Diff-only payload — keeps the server's reconfirm + capacity guards
+    // tight (DESD-97 hotfix re-runs duplicate + capacity checks inside the
+    // schedule lock when status flips to confirmed) and avoids no-op writes.
+    const diff: BeachBookingUpdateInput = {};
     if (status !== booking.status) diff.status = status;
-    if (date !== booking.date) diff.date = date;
     const nextGuests = Number(guests);
     if (!Number.isNaN(nextGuests) && nextGuests !== booking.guests) {
       diff.guests = nextGuests;
@@ -82,21 +78,14 @@ export function ParkBookingEditDialog({
     }
 
     try {
-      await updateParkBooking(booking.id, diff);
+      await updateBeachBooking(booking.id, diff);
       toast.success(`Updated booking #${booking.id}.`);
       onSuccess();
     } catch (error) {
-      // DESD-95: cancel/date-change is blocked when the same reservation has
-      // confirmed activity bookings on this day. Surface the count so the
-      // operator knows where to go next.
-      const blocking = asBlockingBookings(error);
-      if (blocking) {
-        toast.error(
-          `Cannot apply — ${blocking.blocking_bookings} activity booking(s) on this date depend on this day-pass. Cancel them first via Activity bookings.`,
-        );
-      } else {
-        setFromApiError(error);
-      }
+      // The reconfirm conflict comes back as 422 errors.status — useFieldErrors
+      // surfaces it inline next to the Status select so the operator sees
+      // exactly which rebook is blocking the reconfirm.
+      setFromApiError(error);
     } finally {
       setSubmitting(false);
     }
@@ -120,7 +109,7 @@ export function ParkBookingEditDialog({
           <FormField label="Status" name="status" errors={fieldErrors}>
             <Select
               value={status}
-              onValueChange={(next) => setStatus(next as ParkBookingStatus)}
+              onValueChange={(next) => setStatus(next as BeachBookingStatus)}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -133,19 +122,10 @@ export function ParkBookingEditDialog({
           </FormField>
 
           <FormField
-            label="Visit date"
-            name="date"
-            errors={fieldErrors}
-            helper="Re-runs seat-pool, open-on-date, uniqueness, and capacity checks."
-          >
-            <DatePicker value={date} onChange={setDate} />
-          </FormField>
-
-          <FormField
             label="Guests"
             name="guests"
             errors={fieldErrors}
-            helper="Total price is recomputed when this changes."
+            helper="Re-runs seat-pool and activity-capacity checks if changed."
           >
             <Input
               type="number"
