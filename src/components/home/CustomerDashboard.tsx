@@ -10,17 +10,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { BookingMixChart } from "@/components/dashboard/BookingMixChart";
 import { ContactStaffNote } from "@/components/dashboard/ContactStaffNote";
-import { SpendOverTimeChart } from "@/components/dashboard/SpendOverTimeChart";
 import { StatTile } from "@/components/dashboard/StatTile";
 import { TripList } from "@/components/dashboard/TripList";
 import { UpcomingBookingsList } from "@/components/dashboard/UpcomingBookingsList";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/auth-context";
 import {
-  computeBookingMix,
-  computeSpendByMonth,
   deriveDashboardAggregates,
   deriveUpcomingBookings,
   fetchCustomerSnapshot,
@@ -98,8 +94,6 @@ export function CustomerDashboard() {
   };
 
   const aggregates = snapshot ? deriveDashboardAggregates(snapshot) : null;
-  const spendByMonth = snapshot ? computeSpendByMonth(snapshot) : [];
-  const bookingMix = snapshot ? computeBookingMix(snapshot) : [];
   const upcoming = snapshot ? deriveUpcomingBookings(snapshot) : [];
 
   return (
@@ -171,11 +165,6 @@ export function CustomerDashboard() {
                   icon={Wallet}
                   accent="primary"
                 />
-              </div>
-
-              <div className="grid gap-4 lg:grid-cols-2">
-                <SpendOverTimeChart data={spendByMonth} />
-                <BookingMixChart data={bookingMix} />
               </div>
 
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
