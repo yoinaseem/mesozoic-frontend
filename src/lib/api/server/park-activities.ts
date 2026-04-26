@@ -2,7 +2,9 @@ import "server-only";
 
 import type { ParkActivity, ThemePark } from "@/types/booking";
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/+$/, "");
+const API_BASE = (
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
+).replace(/\/+$/, "");
 
 async function fetchJson<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -20,7 +22,9 @@ export async function fetchParkActivities(): Promise<ParkActivity[]> {
 
   const activitySets = await Promise.all(
     parks.data.map((park) =>
-      fetchJson<{ data: ParkActivity[] }>(`/api/theme-parks/${park.id}/activities`),
+      fetchJson<{ data: ParkActivity[] }>(
+        `/api/theme-parks/${park.id}/activities`,
+      ),
     ),
   );
 
