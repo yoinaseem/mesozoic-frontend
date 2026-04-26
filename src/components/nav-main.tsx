@@ -127,7 +127,10 @@ function NavMainItem({
                   <SidebarMenuSubItem key={subItem.title}>
                     <SidebarMenuSubButton
                       asChild
-                      isActive={pathname === subItem.url}
+                      isActive={
+                        pathname === subItem.url ||
+                        pathname.startsWith(subItem.url + "/")
+                      }
                       className={ACTIVE_CLASS}
                     >
                       <Link href={subItem.url}>

@@ -2,6 +2,8 @@
 // JsonResource responses documented in API_INTEGRATION.md and inferred from
 // app/Http/Resources/*.php.
 
+import type { AuthUser } from "@/types/auth";
+
 export type RoomType = {
   id: number;
   hotel_id: number;
@@ -187,6 +189,32 @@ export type ReservationSummary = {
   user_id?: number;
   created_at?: string;
   updated_at?: string;
+};
+
+export type ReservationStatus = "active" | "partial" | "cancelled";
+
+export type ReservationBookingsSummary = {
+  rooms: number;
+  park: number;
+  beach: number;
+  activity: number;
+  ferry: number;
+};
+
+// Full reservation shape returned by GET /reservations and GET /reservations/{id}.
+// `status`, `total_amount`, and `bookings_summary` are pending backend work
+// (see RESERVATIONS_BACKEND_BRIEF.md) — typed as optional so the UI degrades
+// gracefully until they ship.
+export type Reservation = {
+  id: number;
+  user_id: number;
+  user?: AuthUser;
+  room_bookings?: RoomBooking[];
+  status?: ReservationStatus;
+  total_amount?: string;
+  bookings_summary?: ReservationBookingsSummary;
+  created_at: string;
+  updated_at: string;
 };
 
 export type RoomBookingStatus = "confirmed" | "cancelled";

@@ -5,6 +5,7 @@ import {
   Umbrella,
   TreePalm,
   Users,
+  Receipt,
   type LucideIcon,
 } from "lucide-react";
 
@@ -26,14 +27,17 @@ export const adminNavItems: AdminNavItem[] = [
     permission: null,
   },
   {
+    title: "Reservations",
+    url: "/admin/reservations",
+    icon: Receipt,
+    permission: "bookings.view",
+  },
+  {
     title: "Hotels",
     url: "/admin/hotels",
     icon: Hotel,
     permission: "hotels.view",
-    items: [
-      { title: "Hotels", url: "/admin/hotels" },
-      { title: "Bookings", url: "/admin/hotels/bookings" },
-    ],
+    items: [{ title: "Bookings", url: "/admin/hotels/bookings" }],
   },
   {
     title: "Ferries",

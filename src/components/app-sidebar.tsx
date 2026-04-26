@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/auth-context";
 import { adminNavItems } from "@/config/admin-sidebar";
 import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
+import { listMyHotels, type MyHotel } from "@/lib/api/room-bookings";
 import {
   Sidebar,
   SidebarContent,
@@ -19,12 +21,51 @@ import { TreePalm } from "lucide-react";
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const { hasPermission, hasRole } = useAuth();
 
-  const visibleItems = adminNavItems.filter((item) => {
-    const permissionOk =
-      item.permission === null || hasPermission(item.permission);
-    const roleOk = !item.role || hasRole(item.role);
-    return permissionOk && roleOk;
-  });
+  // Hotel-managers (but not superadmins, whose /auth/me/hotels returns every
+  // live hotel) get a one-click jump from the sidebar into each hotel they
+  // manage. Fetched once on mount; falls back silently to the static config
+  // if the request fails.
+  const isHotelManagerOnly =
+    hasRole("hotel-manager") && !hasRole("superadmin");
+  const [myHotels, setMyHotels] = useState<MyHotel[] | null>(null);
+
+  useEffect(() => {
+    if (!isHotelManagerOnly) return;
+    let cancelled = false;
+    listMyHotels()
+      .then((res) => {
+        if (!cancelled) setMyHotels(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setMyHotels([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isHotelManagerOnly]);
+
+  const visibleItems = useMemo(() => {
+    return adminNavItems
+      .filter((item) => {
+        const permissionOk =
+          item.permission === null || hasPermission(item.permission);
+        const roleOk = !item.role || hasRole(item.role);
+        return permissionOk && roleOk;
+      })
+      .map((item) => {
+        if (item.title !== "Hotels" || !myHotels?.length) return item;
+        return {
+          ...item,
+          items: [
+            ...myHotels.map((h) => ({
+              title: h.name,
+              url: `/admin/hotels/${h.id}`,
+            })),
+            ...(item.items ?? []),
+          ],
+        };
+      });
+  }, [hasPermission, hasRole, myHotels]);
 
   return (
     <Sidebar variant="inset" {...props}>
