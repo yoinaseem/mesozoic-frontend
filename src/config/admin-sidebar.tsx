@@ -53,6 +53,7 @@ export const adminNavItems: AdminNavItem[] = [
     items: [
       { title: "Activities", url: "/admin/beach-activities" },
       { title: "Schedules", url: "/admin/beach-activity-schedules" },
+      { title: "Bookings", url: "/admin/beach-bookings" },
     ],
   },
   {
