@@ -64,3 +64,17 @@ export async function updateFerryBooking(
 export async function cancelFerryBooking(bookingId: number) {
   return apiRequest<null>(`/ferry-bookings/${bookingId}`, { method: "DELETE" });
 }
+
+export type CreateFerryBookingPayload = {
+  reservation_id: number;
+  ferry_schedule_id: number;
+  travel_date: string;
+  guests: number;
+};
+
+export async function createFerryBooking(payload: CreateFerryBookingPayload) {
+  return apiRequest<DataEnvelope<FerryBooking>>("/ferry-bookings", {
+    method: "POST",
+    body: payload,
+  });
+}

@@ -11,6 +11,15 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Ticket modules use Reservation::seatPoolOn, which is exclusive on
+// check-out — guests are leaving that day. Subtract one day to get the
+// last bookable visit date.
+function previousDayIso(date: string): string {
+  const d = new Date(`${date}T00:00:00`);
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 function formatDateDdMmYyyy(date: string): string {
   const dateOnly = date.split("T")[0];
   const parts = dateOnly.split("-");
@@ -21,7 +30,10 @@ function formatDateDdMmYyyy(date: string): string {
 }
 
 export function ThemeParkStep() {
-  const { cart, setParkTicket } = useBookingCart();
+  const { cart, setParkTicket, existingBookings } = useBookingCart();
+  const room = cart.room;
+  const minVisitDate = room?.checkIn ?? todayIso();
+  const maxVisitDate = room ? previousDayIso(room.checkOut) : undefined;
 
   const [parks, setParks] = useState<ThemePark[]>([]);
   const [loadingParks, setLoadingParks] = useState(true);
@@ -99,6 +111,20 @@ export function ThemeParkStep() {
       setError("The park is closed on this date. Pick another day.");
       return;
     }
+    if (room) {
+      if (visitDate < room.checkIn || visitDate >= room.checkOut) {
+        setError(
+          "Visit date must fall on or after check-in and before check-out.",
+        );
+        return;
+      }
+    }
+    if (existingBookings.parkDates.has(`${selectedPark.id}|${visitDate}`)) {
+      setError(
+        "Your existing trip already has a day-pass for this park on this date.",
+      );
+      return;
+    }
     if (selectedPark.capacity !== null && guests > selectedPark.capacity) {
       setError(`Daily capacity is ${selectedPark.capacity} guests.`);
       return;
@@ -169,11 +195,18 @@ export function ThemeParkStep() {
           <DatePicker
             id="park-date"
             className="mt-2"
-            min={todayIso()}
+            min={minVisitDate}
+            max={maxVisitDate}
             value={visitDate}
             onChange={setVisitDate}
             placeholder="Select visit date"
           />
+          {room ? (
+            <p className="text-muted mt-1 text-xs">
+              Within your stay: {room.checkIn} – {previousDayIso(room.checkOut)}{" "}
+              (excludes check-out day).
+            </p>
+          ) : null}
         </div>
         <div>
           <label

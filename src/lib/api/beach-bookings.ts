@@ -69,3 +69,16 @@ export async function updateBeachBooking(
 export async function cancelBeachBooking(bookingId: number) {
   return apiRequest<null>(`/beach-bookings/${bookingId}`, { method: "DELETE" });
 }
+
+export type CreateBeachBookingPayload = {
+  reservation_id: number;
+  beach_activity_schedule_id: number;
+  guests: number;
+};
+
+export async function createBeachBooking(payload: CreateBeachBookingPayload) {
+  return apiRequest<DataEnvelope<BeachBooking>>("/beach-bookings", {
+    method: "POST",
+    body: payload,
+  });
+}

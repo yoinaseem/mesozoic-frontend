@@ -10,7 +10,8 @@ import {
 import type { BeachActivity, BeachActivitySchedule } from "@/types/booking";
 
 export function BeachActivityStep() {
-  const { cart, setBeachActivity } = useBookingCart();
+  const { cart, setBeachActivity, existingBookings } = useBookingCart();
+  const room = cart.room;
 
   const [activities, setActivities] = useState<BeachActivity[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(true);
@@ -70,10 +71,18 @@ export function BeachActivityStep() {
   }, [selectedActivityId]);
 
   // Beach schedules go pending → confirmed; cancelled is the only hard exclusion.
-  const bookableSchedules = useMemo(
-    () => schedules.filter((s) => s.status !== "cancelled"),
-    [schedules],
-  );
+  // Beach uses Reservation::seatPoolOn which excludes the check-out date, so
+  // any schedule on or after check-out is unbookable for this trip.
+  const bookableSchedules = useMemo(() => {
+    return schedules.filter((s) => {
+      if (s.status === "cancelled") return false;
+      if (room) {
+        if (s.activity_date < room.checkIn) return false;
+        if (s.activity_date >= room.checkOut) return false;
+      }
+      return true;
+    });
+  }, [schedules, room]);
 
   const selectedActivity =
     activities.find((a) => a.id === selectedActivityId) ?? null;
@@ -168,13 +177,19 @@ export function BeachActivityStep() {
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {bookableSchedules.map((s) => {
                 const active = selectedScheduleId === s.id;
+                const alreadyBooked = existingBookings.beachScheduleIds.has(
+                  s.id,
+                );
                 return (
                   <button
                     key={s.id}
                     type="button"
+                    disabled={alreadyBooked}
                     onClick={() => setSelectedScheduleId(s.id)}
                     className={`rounded-lg border p-3 text-left text-sm transition-colors ${
-                      active
+                      alreadyBooked
+                        ? "border-base bg-base/40 opacity-60 cursor-not-allowed"
+                        : active
                         ? "border-primary bg-primary/5"
                         : "border-base hover:border-primary"
                     }`}
@@ -184,7 +199,8 @@ export function BeachActivityStep() {
                       {s.activity_date}
                     </p>
                     <p className="text-muted">
-                      {s.start_time} · {s.status}
+                      {s.start_time} ·{" "}
+                      {alreadyBooked ? "Already booked" : s.status}
                     </p>
                   </button>
                 );

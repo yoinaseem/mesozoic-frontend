@@ -1,6 +1,22 @@
 "use client";
 
-import { useBookingCart } from "@/context/booking-cart-context";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import {
+  type SubmitResult,
+  type SubmitStep,
+  useBookingCart,
+} from "@/context/booking-cart-context";
+
+const STEP_LABELS: Record<SubmitStep, string> = {
+  room: "Room",
+  "park-ticket": "Theme park ticket",
+  "park-activity": "Park activity",
+  "beach-activity": "Beach activity",
+  ferry: "Ferry",
+};
 
 function Line({ label, value }: { label: string; value: string }) {
   return (
@@ -12,7 +28,37 @@ function Line({ label, value }: { label: string; value: string }) {
 }
 
 export function BookingSummary() {
-  const { cart, canBook, hasAnyAddOn } = useBookingCart();
+  const router = useRouter();
+  const { cart, canBook, hasAnyAddOn, submitting, submitCart, reset } =
+    useBookingCart();
+
+  const [lastResult, setLastResult] = useState<SubmitResult | null>(null);
+
+  const handleSubmit = async () => {
+    setLastResult(null);
+    const result = await submitCart();
+    setLastResult(result);
+
+    if (result.errors.length === 0 && result.room) {
+      toast.success("Trip booked. Check your dashboard for the details.");
+      reset();
+      router.push("/dashboard");
+      return;
+    }
+
+    // The room booking is the foundation — if it failed, nothing else ran.
+    // Otherwise the room landed and one or more add-ons reported errors;
+    // surface a less-alarming "partial" toast so the user knows what to fix.
+    if (!result.room) {
+      toast.error(
+        result.errors[0]?.message ?? "Could not create the room booking.",
+      );
+    } else {
+      toast.warning(
+        `Room booked, but ${result.errors.length} add-on(s) need attention.`,
+      );
+    }
+  };
 
   return (
     <aside className="card space-y-5 lg:sticky lg:top-24">
@@ -29,7 +75,6 @@ export function BookingSummary() {
           <div className="space-y-1">
             <Line label="Hotel" value={cart.room.hotel.name} />
             <Line label="Type" value={cart.room.roomType.name} />
-            <Line label="Room" value={cart.room.room.room_no} />
             <Line
               label="Dates"
               value={`${cart.room.checkIn} → ${cart.room.checkOut}`}
@@ -42,12 +87,10 @@ export function BookingSummary() {
       </section>
 
       {cart.ferry ? (
-        // TODO(DESD-100): the ferry summary needs the customer-picked
-        // travel_date once the customer FerryStep is re-implemented around the
-        // (slot, date) booking shape. Slots no longer carry per-trip dates.
         <section className="space-y-2">
           <h4 className="text-base-color text-sm font-semibold">Ferry</h4>
           <Line label="Ferry" value={cart.ferry.ferry.name} />
+          <Line label="Travel date" value={cart.ferry.travelDate} />
           <Line
             label="Departure Time"
             value={cart.ferry.schedule.departure_time}
@@ -103,16 +146,53 @@ export function BookingSummary() {
         </section>
       ) : null}
 
+      {lastResult && lastResult.errors.length > 0 ? (
+        <div className="border-danger/40 bg-danger/5 space-y-2 rounded-lg border p-3 text-sm">
+          <p className="text-danger font-semibold">
+            {lastResult.room
+              ? "Some add-ons could not be booked:"
+              : "Booking failed:"}
+          </p>
+          <ul className="space-y-1.5">
+            {lastResult.errors.map((err) => {
+              const fieldEntries = Object.entries(err.fieldErrors);
+              return (
+                <li key={`${err.step}-${err.message}`} className="space-y-0.5">
+                  <p className="text-base-color">
+                    <span className="font-medium">
+                      {STEP_LABELS[err.step]}:
+                    </span>{" "}
+                    {err.message}
+                  </p>
+                  {fieldEntries.length > 0 ? (
+                    <ul className="text-muted ml-3 list-disc text-xs">
+                      {fieldEntries.flatMap(([field, msgs]) =>
+                        msgs.map((msg, i) => (
+                          <li key={`${field}-${i}`}>
+                            <span className="font-medium">{field}:</span> {msg}
+                          </li>
+                        )),
+                      )}
+                    </ul>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+
       <div className="border-base border-t pt-4">
         <button
           type="button"
           className="btn-accent w-full"
-          disabled={!canBook}
+          disabled={!canBook || submitting}
+          onClick={handleSubmit}
           title={
             canBook ? undefined : "Confirm a room before sending the booking."
           }
         >
-          Review &amp; book
+          {submitting ? "Sending booking…" : "Review & book"}
         </button>
         {!canBook ? (
           <p className="text-muted mt-2 text-center text-xs">

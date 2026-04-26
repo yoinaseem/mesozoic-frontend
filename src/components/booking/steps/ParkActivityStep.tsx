@@ -10,8 +10,10 @@ import {
 import type { ParkActivity, ParkActivitySchedule } from "@/types/booking";
 
 export function ParkActivityStep() {
-  const { cart, setParkActivity } = useBookingCart();
+  const { cart, setParkActivity, existingBookings } = useBookingCart();
   const park = cart.parkTicket?.park ?? null;
+  const parkTicket = cart.parkTicket;
+  const room = cart.room;
 
   const [activities, setActivities] = useState<ParkActivity[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
@@ -74,10 +76,20 @@ export function ParkActivityStep() {
     };
   }, [park, selectedActivityId]);
 
-  const bookableSchedules = useMemo(
-    () => schedules.filter((s) => s.status === "scheduled"),
-    [schedules],
-  );
+  // The day-pass coupling rule (§14): activity date must match the held
+  // park ticket's date. The room-window check is also enforced because the
+  // server re-validates seatPoolOn (exclusive checkout).
+  const bookableSchedules = useMemo(() => {
+    return schedules.filter((s) => {
+      if (s.status !== "scheduled") return false;
+      if (parkTicket && s.date !== parkTicket.visitDate) return false;
+      if (room) {
+        if (s.date < room.checkIn) return false;
+        if (s.date >= room.checkOut) return false;
+      }
+      return true;
+    });
+  }, [schedules, parkTicket, room]);
 
   const selectedActivity =
     activities.find((a) => a.id === selectedActivityId) ?? null;
@@ -181,18 +193,27 @@ export function ParkActivityStep() {
           {loadingSchedules ? (
             <p className="text-muted text-sm">Loading slots…</p>
           ) : bookableSchedules.length === 0 ? (
-            <p className="text-muted text-sm">No upcoming slots scheduled.</p>
+            <p className="text-muted text-sm">
+              {parkTicket
+                ? `No slots for ${parkTicket.visitDate} on this activity. Pick a different activity or adjust your park ticket date.`
+                : "No upcoming slots scheduled."}
+            </p>
           ) : (
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {bookableSchedules.map((s) => {
                 const active = selectedScheduleId === s.id;
+                const alreadyBooked =
+                  existingBookings.parkActivityScheduleIds.has(s.id);
                 return (
                   <button
                     key={s.id}
                     type="button"
+                    disabled={alreadyBooked}
                     onClick={() => setSelectedScheduleId(s.id)}
                     className={`rounded-lg border p-3 text-left text-sm transition-colors ${
-                      active
+                      alreadyBooked
+                        ? "border-base bg-base/40 opacity-60 cursor-not-allowed"
+                        : active
                         ? "border-primary bg-primary/5"
                         : "border-base hover:border-primary"
                     }`}
@@ -202,6 +223,7 @@ export function ParkActivityStep() {
                     <p className="text-muted">
                       {s.start_time ?? "—"}
                       {s.end_time ? ` – ${s.end_time}` : ""}
+                      {alreadyBooked ? " · Already booked" : ""}
                     </p>
                   </button>
                 );

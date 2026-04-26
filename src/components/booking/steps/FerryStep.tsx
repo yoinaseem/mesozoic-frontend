@@ -1,18 +1,15 @@
 "use client";
 
-// TODO(DESD-100): full re-implementation needed. Slots are now recurring (no
-// per-trip date / status), so the customer flow needs its own travel-date
-// picker. This file is patched to compile against the new types only — the
-// removed-column UI is a placeholder until the proper re-build lands.
-
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { useBookingCart } from "@/context/booking-cart-context";
 import { listFerries, listFerrySchedules } from "@/lib/api/ferries";
 import type { Ferry, FerrySchedule } from "@/types/booking";
 
 export function FerryStep() {
-  const { cart, setFerry } = useBookingCart();
+  const { cart, setFerry, existingBookings } = useBookingCart();
+  const room = cart.room;
 
   const [ferries, setFerries] = useState<Ferry[]>([]);
   const [loadingFerries, setLoadingFerries] = useState(true);
@@ -26,8 +23,12 @@ export function FerryStep() {
     cart.ferry?.schedule.id ?? null,
   );
 
+  const [travelDate, setTravelDate] = useState<string>(
+    cart.ferry?.travelDate ?? room?.checkIn ?? "",
+  );
+
   const [passengers, setPassengers] = useState<number>(
-    cart.ferry?.passengers ?? cart.room?.guests ?? 1,
+    cart.ferry?.passengers ?? room?.guests ?? 1,
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -71,21 +72,34 @@ export function FerryStep() {
     };
   }, [selectedFerryId]);
 
-  // DESD-100: slots are no longer per-trip rows with a status; every returned
-  // slot is bookable (the date is picked at booking time, not authored here).
-  const bookableSchedules = schedules;
-
   const selectedFerry = ferries.find((f) => f.id === selectedFerryId) ?? null;
   const selectedSchedule =
     schedules.find((s) => s.id === selectedScheduleId) ?? null;
 
-  // Capacity + price live on the ferry type post-DESD-100; vessels inherit them.
   const ferryCapacity = selectedFerry?.ferry_type?.capacity ?? 0;
+
+  // Ferries use ferrySeatPoolOn — inclusive of both check-in and check-out.
+  const minTravelDate = room?.checkIn ?? new Date().toISOString().slice(0, 10);
+  const maxTravelDate = room?.checkOut ?? "";
+  const travelDateValid = useMemo(() => {
+    if (!travelDate || !room) return false;
+    return travelDate >= room.checkIn && travelDate <= room.checkOut;
+  }, [travelDate, room]);
 
   const handleConfirm = () => {
     setError(null);
     if (!selectedFerry || !selectedSchedule) {
       setError("Pick a ferry and a scheduled departure.");
+      return;
+    }
+    if (!travelDate) {
+      setError("Pick a travel date for the crossing.");
+      return;
+    }
+    if (!travelDateValid) {
+      setError(
+        "Travel date must fall on or between your check-in and check-out.",
+      );
       return;
     }
     if (passengers < 1) {
@@ -96,7 +110,22 @@ export function FerryStep() {
       setError(`This ferry carries up to ${ferryCapacity} passengers.`);
       return;
     }
-    setFerry({ ferry: selectedFerry, schedule: selectedSchedule, passengers });
+    if (
+      existingBookings.ferryScheduleDates.has(
+        `${selectedSchedule.id}|${travelDate}`,
+      )
+    ) {
+      setError(
+        "Your existing trip already has a ferry on this slot for this date.",
+      );
+      return;
+    }
+    setFerry({
+      ferry: selectedFerry,
+      schedule: selectedSchedule,
+      travelDate,
+      passengers,
+    });
   };
 
   return (
@@ -104,8 +133,7 @@ export function FerryStep() {
       <header className="space-y-1">
         <h2 className="text-2xl font-semibold text-primary">Ferry booking</h2>
         <p className="text-muted text-sm">
-          Pick a ferry and see its full departure schedule before locking in a
-          crossing.
+          Pick a ferry, the departure slot, and the day you want to cross.
         </p>
       </header>
 
@@ -156,7 +184,7 @@ export function FerryStep() {
           </label>
           {loadingSchedules ? (
             <p className="text-muted text-sm">Loading schedules…</p>
-          ) : bookableSchedules.length === 0 ? (
+          ) : schedules.length === 0 ? (
             <p className="text-muted text-sm">
               No scheduled crossings are currently published.
             </p>
@@ -172,7 +200,7 @@ export function FerryStep() {
                   </tr>
                 </thead>
                 <tbody>
-                  {bookableSchedules.map((s) => {
+                  {schedules.map((s) => {
                     const active = selectedScheduleId === s.id;
                     return (
                       <tr
@@ -210,22 +238,46 @@ export function FerryStep() {
         </div>
       ) : null}
 
-      <div className="max-w-xs">
-        <label
-          htmlFor="ferry-passengers"
-          className="block text-sm font-medium text-base-color"
-        >
-          Passengers
-        </label>
-        <Input
-          id="ferry-passengers"
-          type="number"
-          min={1}
-          max={ferryCapacity || 100}
-          className="mt-2"
-          value={passengers}
-          onChange={(e) => setPassengers(Number(e.target.value))}
-        />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label
+            htmlFor="ferry-date"
+            className="block text-sm font-medium text-base-color"
+          >
+            Travel date
+          </label>
+          <DatePicker
+            id="ferry-date"
+            className="mt-2"
+            min={minTravelDate}
+            max={maxTravelDate || undefined}
+            value={travelDate}
+            onChange={setTravelDate}
+            placeholder="Select travel date"
+          />
+          {room ? (
+            <p className="text-muted mt-1 text-xs">
+              Within your stay: {room.checkIn} – {room.checkOut} (inclusive).
+            </p>
+          ) : null}
+        </div>
+        <div>
+          <label
+            htmlFor="ferry-passengers"
+            className="block text-sm font-medium text-base-color"
+          >
+            Passengers
+          </label>
+          <Input
+            id="ferry-passengers"
+            type="number"
+            min={1}
+            max={ferryCapacity || 100}
+            className="mt-2"
+            value={passengers}
+            onChange={(e) => setPassengers(Number(e.target.value))}
+          />
+        </div>
       </div>
 
       {error ? <p className="text-sm text-danger">{error}</p> : null}

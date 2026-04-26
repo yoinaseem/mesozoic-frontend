@@ -2,6 +2,8 @@ import { apiRequest } from "@/lib/api-client";
 import type { Paginated } from "@/types/auth";
 import type { RoomBooking, RoomBookingStatus } from "@/types/booking";
 
+type DataEnvelope<T> = { data: T };
+
 export type ListRoomBookingsParams = {
   page?: number;
   status?: RoomBookingStatus;
@@ -27,6 +29,23 @@ export type MyHotel = { id: number; name: string };
 
 export async function listMyHotels() {
   return apiRequest<{ data: MyHotel[] }>("/auth/me/hotels");
+}
+
+// POST /room-bookings — server picks the room (lowest free of room_type_id),
+// so payload omits hotel_id/room_id. Reservation auto-creates when omitted.
+export type CreateRoomBookingPayload = {
+  reservation_id?: number;
+  room_type_id: number;
+  check_in_date: string;
+  check_out_date: string;
+  guests: number;
+};
+
+export async function createRoomBooking(payload: CreateRoomBookingPayload) {
+  return apiRequest<DataEnvelope<RoomBooking>>("/room-bookings", {
+    method: "POST",
+    body: payload,
+  });
 }
 
 // Soft-cancel: backend flips status to "cancelled" and sets cancelled_at

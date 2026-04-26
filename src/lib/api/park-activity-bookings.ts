@@ -73,3 +73,28 @@ export async function cancelParkActivityBooking(bookingId: number) {
     method: "DELETE",
   });
 }
+
+// DESD-95: two payload shapes. Timed-flow targets an authored schedule;
+// all-day flow lets the server materialise a per-date schedule from
+// (park_activity_id, date) for activities with is_all_day=true.
+export type CreateParkActivityBookingPayload =
+  | {
+      reservation_id: number;
+      park_activity_schedule_id: number;
+      guests: number;
+    }
+  | {
+      reservation_id: number;
+      park_activity_id: number;
+      date: string;
+      guests: number;
+    };
+
+export async function createParkActivityBooking(
+  payload: CreateParkActivityBookingPayload,
+) {
+  return apiRequest<DataEnvelope<ParkActivityBooking>>(
+    "/park-activity-bookings",
+    { method: "POST", body: payload },
+  );
+}

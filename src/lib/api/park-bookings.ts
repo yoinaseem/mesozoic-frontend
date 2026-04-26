@@ -54,3 +54,17 @@ export async function updateParkBooking(
 export async function cancelParkBooking(bookingId: number) {
   return apiRequest<null>(`/park-bookings/${bookingId}`, { method: "DELETE" });
 }
+
+export type CreateParkBookingPayload = {
+  reservation_id: number;
+  park_id: number;
+  date: string;
+  guests: number;
+};
+
+export async function createParkBooking(payload: CreateParkBookingPayload) {
+  return apiRequest<DataEnvelope<ParkBooking>>("/park-bookings", {
+    method: "POST",
+    body: payload,
+  });
+}

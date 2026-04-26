@@ -344,18 +344,25 @@ export type EffectiveHour = {
 
 // --- Cart selections (client-side only; submitted as booking payloads later) ---
 
+// Room number is NOT carried in the cart — POST /room-bookings picks the
+// lowest-numbered free room of room_type_id server-side. The customer-facing
+// flow only collects hotel + type + window + guest count.
 export type RoomSelection = {
   hotel: Hotel;
   roomType: RoomType;
-  room: Room;
   checkIn: string;
   checkOut: string;
   guests: number;
 };
 
+// `travelDate` is required per DESD-100 (slots are recurring; the date lives
+// on the booking row, not the schedule). Must fall within the room's
+// inclusive window — ferries use Reservation::ferrySeatPoolOn, which counts
+// both arrival and departure days.
 export type FerrySelection = {
   ferry: Ferry;
   schedule: FerrySchedule;
+  travelDate: string;
   passengers: number;
 };
 

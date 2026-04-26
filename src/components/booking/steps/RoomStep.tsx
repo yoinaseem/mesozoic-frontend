@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { useBookingCart } from "@/context/booking-cart-context";
 import { getHotel, listHotels } from "@/lib/api/hotels";
-import { listRooms } from "@/lib/api/rooms";
-import type { Hotel, Room, RoomType } from "@/types/booking";
+import type { Hotel, RoomType } from "@/types/booking";
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -18,8 +17,61 @@ function tomorrowIso(): string {
   return d.toISOString().slice(0, 10);
 }
 
+function AnchoredRoomSummary() {
+  const { cart, reset } = useBookingCart();
+  if (!cart.room) return null;
+  return (
+    <section className="card space-y-4">
+      <header className="space-y-1">
+        <h2 className="text-2xl font-semibold text-primary">
+          Room — already booked
+        </h2>
+        <p className="text-muted text-sm">
+          We&rsquo;re adding to your existing trip. The room below is already
+          confirmed; pick activities from the steps above.
+        </p>
+      </header>
+
+      <dl className="border-base divide-base divide-y rounded-lg border text-sm">
+        <div className="flex justify-between px-4 py-2">
+          <dt className="text-muted">Hotel</dt>
+          <dd className="font-medium">{cart.room.hotel.name}</dd>
+        </div>
+        <div className="flex justify-between px-4 py-2">
+          <dt className="text-muted">Room type</dt>
+          <dd className="font-medium">{cart.room.roomType.name}</dd>
+        </div>
+        <div className="flex justify-between px-4 py-2">
+          <dt className="text-muted">Check-in</dt>
+          <dd className="font-medium">{cart.room.checkIn}</dd>
+        </div>
+        <div className="flex justify-between px-4 py-2">
+          <dt className="text-muted">Check-out</dt>
+          <dd className="font-medium">{cart.room.checkOut}</dd>
+        </div>
+        <div className="flex justify-between px-4 py-2">
+          <dt className="text-muted">Guests</dt>
+          <dd className="font-medium">{cart.room.guests}</dd>
+        </div>
+      </dl>
+
+      <button
+        type="button"
+        className="text-sm font-semibold text-danger hover:opacity-80"
+        onClick={reset}
+      >
+        Start a new trip instead
+      </button>
+    </section>
+  );
+}
+
 export function RoomStep() {
-  const { cart, setRoom } = useBookingCart();
+  const { cart, setRoom, roomAlreadyExists } = useBookingCart();
+
+  if (roomAlreadyExists) {
+    return <AnchoredRoomSummary />;
+  }
 
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loadingHotels, setLoadingHotels] = useState(true);
@@ -35,14 +87,6 @@ export function RoomStep() {
 
   const [selectedRoomTypeId, setSelectedRoomTypeId] = useState<number | null>(
     cart.room?.roomType.id ?? null,
-  );
-
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [roomsLoadedFor, setRoomsLoadedFor] = useState<number | null>(null);
-  const loadingRooms =
-    selectedHotelId !== null && roomsLoadedFor !== selectedHotelId;
-  const [selectedRoomId, setSelectedRoomId] = useState<number | null>(
-    cart.room?.room.id ?? null,
   );
 
   const [checkIn, setCheckIn] = useState<string>(
@@ -91,43 +135,16 @@ export function RoomStep() {
     };
   }, [selectedHotelId]);
 
-  useEffect(() => {
-    if (selectedHotelId === null) return;
-    let cancelled = false;
-    const hotelId = selectedHotelId;
-    listRooms(hotelId)
-      .then((res) => {
-        if (cancelled) return;
-        setRooms(res.data);
-        setRoomsLoadedFor(hotelId);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setRoomsLoadedFor(hotelId);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedHotelId]);
-
   const roomTypes: RoomType[] = hotelDetail?.room_types ?? [];
-  const roomsForType = useMemo(
-    () =>
-      selectedRoomTypeId === null
-        ? []
-        : rooms.filter((r) => r.room_type_id === selectedRoomTypeId),
-    [rooms, selectedRoomTypeId],
-  );
 
   const selectedHotel = hotels.find((h) => h.id === selectedHotelId) ?? null;
   const selectedRoomType =
     roomTypes.find((t) => t.id === selectedRoomTypeId) ?? null;
-  const selectedRoom = rooms.find((r) => r.id === selectedRoomId) ?? null;
 
   const handleConfirm = () => {
     setError(null);
-    if (!selectedHotel || !selectedRoomType || !selectedRoom) {
-      setError("Pick a hotel, room type, and room number to continue.");
+    if (!selectedHotel || !selectedRoomType) {
+      setError("Pick a hotel and a room type to continue.");
       return;
     }
     if (new Date(checkOut) <= new Date(checkIn)) {
@@ -150,7 +167,6 @@ export function RoomStep() {
     setRoom({
       hotel: selectedHotel,
       roomType: selectedRoomType,
-      room: selectedRoom,
       checkIn,
       checkOut,
       guests,
@@ -161,7 +177,6 @@ export function RoomStep() {
     setRoom(null);
     setSelectedHotelId(null);
     setSelectedRoomTypeId(null);
-    setSelectedRoomId(null);
     setError(null);
   };
 
@@ -170,8 +185,8 @@ export function RoomStep() {
       <header className="space-y-1">
         <h2 className="text-2xl font-semibold text-primary">Room booking</h2>
         <p className="text-muted text-sm">
-          Every stay on the isle starts with a room. Pick your hotel and dates
-          below to unlock ferries, theme parks, and beach activities.
+          Every stay on the isle starts with a room. Pick your hotel, room type,
+          and dates — we&rsquo;ll assign the actual room number for you.
         </p>
       </header>
 
@@ -194,7 +209,6 @@ export function RoomStep() {
                   onClick={() => {
                     setSelectedHotelId(hotel.id);
                     setSelectedRoomTypeId(null);
-                    setSelectedRoomId(null);
                   }}
                   className={`rounded-lg border p-4 text-left transition-colors ${
                     active
@@ -233,10 +247,7 @@ export function RoomStep() {
                   <button
                     key={rt.id}
                     type="button"
-                    onClick={() => {
-                      setSelectedRoomTypeId(rt.id);
-                      setSelectedRoomId(null);
-                    }}
+                    onClick={() => setSelectedRoomTypeId(rt.id)}
                     className={`rounded-lg border p-4 text-left transition-colors ${
                       active
                         ? "border-primary bg-primary/5"
@@ -253,42 +264,6 @@ export function RoomStep() {
                 );
               })}
             </div>
-          )}
-        </div>
-      ) : null}
-
-      {selectedRoomTypeId !== null ? (
-        <div className="space-y-2">
-          <label
-            htmlFor="room-select"
-            className="block text-sm font-medium text-base-color"
-          >
-            Room number
-          </label>
-          {loadingRooms ? (
-            <p className="text-muted text-sm">Loading rooms…</p>
-          ) : roomsForType.length === 0 ? (
-            <p className="text-muted text-sm">
-              No rooms available for this type.
-            </p>
-          ) : (
-            <select
-              id="room-select"
-              value={selectedRoomId ?? ""}
-              onChange={(e) =>
-                setSelectedRoomId(
-                  e.target.value ? Number(e.target.value) : null,
-                )
-              }
-              className="border-base bg-surface focus:ring-primary h-10 w-full rounded-md border px-3 text-sm focus:outline-none focus:ring-2"
-            >
-              <option value="">Select a room…</option>
-              {roomsForType.map((r) => (
-                <option key={r.id} value={r.id}>
-                  Room {r.room_no}
-                </option>
-              ))}
-            </select>
           )}
         </div>
       ) : null}
