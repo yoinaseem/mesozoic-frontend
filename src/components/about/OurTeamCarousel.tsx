@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 type TeamMember = {
@@ -62,7 +62,6 @@ function getCardStep(scroller: HTMLElement): number {
 
 export function OurTeamCarousel() {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const recenter = useCallback(() => {
     const el = scrollerRef.current;
@@ -90,7 +89,6 @@ export function OurTeamCarousel() {
     if (!el) return;
     let settleTimer: ReturnType<typeof setTimeout> | null = null;
     const onScroll = () => {
-      setIsTransitioning(true);
       if (settleTimer) clearTimeout(settleTimer);
       settleTimer = setTimeout(() => {
         const step = getCardStep(el);
@@ -100,7 +98,6 @@ export function OurTeamCarousel() {
         const middleEnd = cycleWidth * 2;
         while (el.scrollLeft >= middleEnd) el.scrollLeft -= cycleWidth;
         while (el.scrollLeft < middleStart) el.scrollLeft += cycleWidth;
-        setIsTransitioning(false);
       }, 140);
     };
     el.addEventListener("scroll", onScroll, { passive: true });
@@ -115,7 +112,6 @@ export function OurTeamCarousel() {
     if (!el) return;
     const step = getCardStep(el);
     if (step === 0) return;
-    setIsTransitioning(true);
     el.scrollBy({
       left: dir === "next" ? step : -step,
       behavior: "smooth",
@@ -127,16 +123,12 @@ export function OurTeamCarousel() {
       <div
         ref={scrollerRef}
         className="flex snap-x snap-mandatory gap-6 overflow-x-auto pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        onPointerDown={() => setIsTransitioning(true)}
-        onTouchStart={() => setIsTransitioning(true)}
       >
         {RENDERED.map((member, i) => (
           <article
             key={`${member.name}-${i}`}
             data-team-card
-            className={`group/depth bg-[#e7e7eb] dark:bg-[#0a1435] relative flex w-[85%] shrink-0 snap-start flex-col overflow-hidden rounded-3xl border border-black/20 p-8 shadow-md ring-1 ring-black/10 transition-all duration-500 hover:border-black/30 hover:ring-black/20 hover:shadow-lg motion-reduce:transition-none dark:border-white/15 dark:ring-black/20 dark:hover:border-accent/45 perspective-distant md:w-[calc((100%-3rem)/3)] ${
-              isTransitioning ? "opacity-65" : "opacity-100"
-            }`}
+            className="group/depth bg-surface border-base relative flex w-[85%] shrink-0 snap-start flex-col overflow-hidden rounded-3xl border p-8 shadow-md transition-all duration-500 hover:shadow-lg motion-reduce:transition-none perspective-distant md:w-[calc((100%-3rem)/3)]"
           >
             <div
               className="pointer-events-none absolute inset-0 bg-linear-to-b from-white/20 to-transparent dark:from-black/20 dark:to-black/8"
@@ -151,18 +143,18 @@ export function OurTeamCarousel() {
             >
               <div
                 aria-hidden
-                className="bg-primary/10 text-primary dark:bg-white/15 dark:text-white flex h-20 w-20 items-center justify-center rounded-full text-2xl font-semibold"
+                className="bg-primary/10 text-primary flex h-20 w-20 items-center justify-center rounded-full text-2xl font-semibold"
               >
                 {member.initials}
               </div>
-              <p className="mt-6 flex-1 text-base leading-relaxed text-black/80 dark:text-white/90">
+              <p className="text-base-color mt-6 flex-1 text-base leading-relaxed">
                 {member.bio}
               </p>
-              <div className="mt-6 border-t border-black/15 pt-5 dark:border-white/20">
-                <p className="font-heading text-lg font-semibold text-black dark:text-white">
+              <div className="border-base mt-6 border-t pt-5">
+                <p className="font-heading text-primary text-lg font-semibold">
                   {member.name}
                 </p>
-                <p className="text-sm font-semibold text-primary dark:text-[#fbbf24]">
+                <p className="text-primary text-sm font-bold">
                   {member.role}
                 </p>
               </div>

@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import Link from "next/link";
 import {
-  ArrowRight,
   Camera,
   Compass,
   HeartHandshake,
@@ -12,6 +10,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { OurTeamCarousel } from "@/components/about/OurTeamCarousel";
+import { PlanCta } from "@/components/home/PlanCta";
 
 export const metadata: Metadata = {
   title: "About Us | Mesozoic Isle",
@@ -22,15 +21,15 @@ export default function AboutPage() {
   return (
     <div className="bg-base min-h-full">
       <section
-        className="relative -mt-16 overflow-hidden bg-surface pb-7 pt-22 md:pb-8 md:pt-26"
+        className="relative -mt-16 overflow-hidden bg-base pb-7 pt-22 md:pb-8 md:pt-26"
         aria-label="About us hero"
       >
         <div
-          className="pointer-events-none absolute inset-0 bg-linear-to-b from-white/70 via-surface to-base dark:from-primary/10 dark:via-base dark:to-base"
+          className="pointer-events-none absolute inset-0 bg-linear-to-b from-white/70 via-surface to-base dark:hidden"
           aria-hidden
         />
         <div
-          className="pointer-events-none absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-accent/10 blur-3xl md:h-96 md:w-96"
+          className="pointer-events-none absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-accent/10 blur-3xl md:h-96 md:w-96 dark:hidden"
           aria-hidden
         />
 
@@ -113,7 +112,7 @@ export default function AboutPage() {
             </p>
             <h2 className="font-heading text-primary mt-6 text-4xl font-bold leading-tight md:text-5xl">
               What island living{" "}
-              <span className="text-primary-deep font-normal italic">
+              <span className="text-primary-deep dark:text-emerald-300 font-normal ">
                 means to us.
               </span>
             </h2>
@@ -161,7 +160,7 @@ export default function AboutPage() {
           <div className="mt-8 grid gap-6 lg:grid-cols-[2fr_1fr] lg:items-end lg:gap-12">
             <h2 className="font-heading max-w-3xl text-4xl font-bold leading-tight text-white md:text-5xl">
               The people behind{" "}
-              <span className="text-accent font-normal italic">
+              <span className="text-accent font-normal ">
                 every island moment.
               </span>
             </h2>
@@ -198,7 +197,7 @@ export default function AboutPage() {
 
           <h2 className="font-heading text-primary mt-6 max-w-3xl text-4xl font-bold leading-tight md:text-5xl">
             Six island{" "}
-            <span className="text-primary-deep font-normal italic">
+            <span className="text-primary-deep dark:text-emerald-300 font-normal ">
               commitments.
             </span>
           </h2>
@@ -208,7 +207,7 @@ export default function AboutPage() {
             {VALUES.map(({ title, description, icon: Icon }) => (
               <li
                 key={title}
-                className="group/value bg-white/95 dark:bg-white/88 border-black/12 dark:border-black/20 flex flex-col gap-5 border px-7 py-9 transition-all duration-300 hover:-translate-y-1 hover:border-black/25 hover:shadow-lg active:-translate-y-1 active:border-black/25 active:shadow-lg motion-reduce:transition-none motion-reduce:transform-none md:px-8 md:py-10"
+                className="group/value bg-surface border-base flex flex-col gap-5 border px-7 py-9 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:-translate-y-1 active:shadow-lg motion-reduce:transition-none motion-reduce:transform-none md:px-8 md:py-10"
               >
                 <span
                   aria-hidden
@@ -217,7 +216,7 @@ export default function AboutPage() {
                   <Icon className="h-6 w-6" aria-hidden />
                 </span>
                 <div>
-                  <h3 className="font-heading text-primary-deep text-xl font-semibold">
+                  <h3 className="font-heading text-primary-deep dark:text-emerald-300 text-xl font-semibold">
                     {title}
                   </h3>
                   <p className="text-base-color mt-3 text-base leading-relaxed">
@@ -229,37 +228,7 @@ export default function AboutPage() {
           </ul>
         </div>
       </section>
-
-      <section className="border-base border-t bg-primary-deep py-20 md:py-24" aria-label="Plan your visit">
-        <div className="mx-auto max-w-3xl px-6 text-center">
-          <p className="text-white/75 text-sm font-semibold uppercase tracking-[0.28em]">
-            Plan Your Visit
-          </p>
-          <h2 className="font-heading mt-6 text-4xl font-bold leading-tight text-white md:text-5xl">
-            Ready to explore{" "}
-            <span className="text-accent font-normal italic">
-              The Kingdom?
-            </span>
-          </h2>
-          <div className="mx-auto mt-5 h-1 w-20 rounded-full bg-accent" aria-hidden />
-          <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-white/90 md:text-lg">
-            Book your park activity and experience the wonders of Mesozoic Isle
-            up close.
-          </p>
-          <div className="mt-8">
-            <Link
-              href="/book"
-              className="bg-accent inline-flex h-12 items-center gap-3 rounded-full px-8 font-heading text-base font-semibold tracking-wide text-black shadow-lg ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#efad24] hover:opacity-100 hover:underline hover:underline-offset-4 hover:shadow-xl focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-primary-deep active:-translate-y-0.5 active:bg-[#d48806] active:opacity-100 active:underline active:underline-offset-4 active:shadow-xl motion-reduce:transition-none motion-reduce:transform-none"
-            >
-              Book Your Activity
-              <ArrowRight
-                aria-hidden
-                className="h-5 w-5 transition-transform duration-300 ease-out motion-reduce:transition-none"
-              />
-            </Link>
-          </div>
-        </div>
-      </section>
+      <PlanCta />
     </div>
   );
 }

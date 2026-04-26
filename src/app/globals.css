@@ -66,20 +66,20 @@
 
 /* Dark mode */
 .dark {
-  --color-bg: #0f172a;
-  --color-surface: #1e293b;
+  --color-bg: #171717;
+  --color-surface: #262626;
 
-  --color-primary: #3c8d63;
+  --color-primary: #52a87a;
   --color-primary-deep: #0d1f15;
-  --color-secondary: #94a3b8;
+  --color-secondary: #a3a3a3;
   --color-accent: #fbbf24;
   --color-lagoon: #5da0a3;
   --color-sage: #6a9886;
 
-  --color-text: #f3f4f6;
-  --color-text-muted: #9ca3af;
+  --color-text: #f5f5f5;
+  --color-text-muted: #a3a3a3;
 
-  --color-border: #334155;
+  --color-border: #404040;
 
   --color-danger: #fca5a5;
 
