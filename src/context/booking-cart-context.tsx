@@ -46,10 +46,9 @@ import type {
   RoomSelection,
 } from "@/types/booking";
 
-// One slot per booking type. The submit pipeline runs in dependency order:
-// room first (so we have a reservation_id), then tickets in parallel where
-// they're independent (parkTicket / beach / ferry), and parkActivity last
-// because the API requires the day-pass row to already exist.
+// Submit pipeline step identifiers (separate from booking-flow step ids).
+// Room/parkTicket/beach/ferry run in dependency order; parkActivity is
+// last because the API requires the day-pass row to already exist.
 export type SubmitStep =
   | "room"
   | "park-ticket"
@@ -65,7 +64,7 @@ export type SubmitStepError = {
 
 export type SubmitResult = {
   reservationId: number | null;
-  room: RoomBooking | null;
+  rooms: RoomBooking[];
   parkBooking: ParkBooking | null;
   parkActivityBooking: ParkActivityBooking | null;
   beachBooking: BeachBooking | null;
@@ -73,47 +72,70 @@ export type SubmitResult = {
   errors: SubmitStepError[];
 };
 
-// Conflict sets surfaced to step UIs when attaching to an existing
-// reservation. Each set is keyed in the form the schedule picker can probe
-// directly, so the lookup is O(1) without per-row computation in the step.
+// Existing tickets on the reservation we're attaching to. We carry the
+// full booking arrays (so the summary can render them and the activity
+// step can derive park/date context from a held day-pass) AND the derived
+// conflict sets used by the duplicate pre-check. Conflict sets are keyed
+// in the form the schedule picker probes directly so lookups stay O(1).
 export type ExistingReservationBookings = {
-  // `${park_id}|${date}` — park-day-pass uniqueness is per (reservation, park, date).
+  parkBookings: ParkBooking[];
+  beachBookings: BeachBooking[];
+  parkActivityBookings: ParkActivityBooking[];
+  ferryBookings: FerryBooking[];
   parkDates: Set<string>;
-  // beach uniqueness is per (reservation, schedule_id) — schedule_id alone suffices.
   beachScheduleIds: Set<number>;
-  // park-activity uniqueness is per (reservation, schedule_id).
   parkActivityScheduleIds: Set<number>;
-  // ferry uniqueness is per (reservation, schedule_id, travel_date) — the
-  // composite key is what the step needs to flag conflicts.
-  ferryScheduleDates: Set<string>; // `${schedule_id}|${travel_date}`
+  ferryScheduleDates: Set<string>;
 };
 
 const EMPTY_EXISTING: ExistingReservationBookings = {
+  parkBookings: [],
+  beachBookings: [],
+  parkActivityBookings: [],
+  ferryBookings: [],
   parkDates: new Set(),
   beachScheduleIds: new Set(),
   parkActivityScheduleIds: new Set(),
   ferryScheduleDates: new Set(),
 };
 
+// The half-open trip window. `checkIn` is the earliest of any room's
+// check-in; `checkOut` is the latest of any room's check-out. Ticket
+// modules use this for client-side date-window filtering. Backend
+// `seatPoolOn` does the per-date authoritative check, so a trip with
+// gaps will surface 422s rather than silently book.
+export type TripWindow = {
+  checkIn: string;
+  checkOut: string;
+};
+
+const STEP_ORDER: BookingStep[] = [
+  "room",
+  "ferry",
+  "park-ticket",
+  "park-activity",
+  "beach-activity",
+];
+
 type BookingCartContextValue = {
   cart: BookingCart;
   reservationId: number | null;
-  // Caller-supplied reservation_id for cross-session attachment. Set by the
-  // overlap-prompt UI when the customer chooses "attach to existing trip";
-  // null means "let the room POST create a fresh reservation".
   attachToReservationId: number | null;
   setAttachToReservationId: (id: number | null) => void;
-  // True when the cart is anchored on a reservation that already has a
-  // confirmed room booking — we synthesise cart.room from it so steps
-  // unlock and date math works, but submitCart skips the room POST. The
-  // overlap dialog flow keeps this false because the user is booking a
-  // brand-new room into the existing trip.
+  // True when the cart is anchored on a reservation that already has at
+  // least one confirmed room. New rooms added in this session still POST.
   roomAlreadyExists: boolean;
   startFromExistingReservation: (
     reservation: Reservation,
     anchorRoomBooking: RoomBooking,
   ) => void;
-  setRoom: (selection: RoomSelection | null) => void;
+  // Multi-room cart actions.
+  addRoom: (selection: RoomSelection) => void;
+  removeRoom: (index: number) => void;
+  clearRooms: () => void;
+  // Convenience getters derived from cart.rooms.
+  primaryRoom: RoomSelection | null;
+  tripWindow: TripWindow | null;
   setFerry: (selection: FerrySelection | null) => void;
   setParkTicket: (selection: ParkTicketSelection | null) => void;
   setParkActivity: (selection: ParkActivitySelection | null) => void;
@@ -124,14 +146,20 @@ type BookingCartContextValue = {
   canBook: boolean;
   submitting: boolean;
   submitCart: () => Promise<SubmitResult>;
-  // Conflict sets sourced from the reservation we're attaching to. Empty
-  // when not attaching (or while the fetch is in flight).
   existingBookings: ExistingReservationBookings;
+  // Active step + nav helpers — lifted into context so each step can
+  // render its own Previous/Next buttons without prop-drilling.
+  activeStep: BookingStep;
+  setActiveStep: (step: BookingStep) => void;
+  goToNextStep: () => void;
+  goToPreviousStep: () => void;
+  hasPreviousStep: boolean;
+  hasNextStep: boolean;
   reset: () => void;
 };
 
 const EMPTY_CART: BookingCart = {
-  room: null,
+  rooms: [],
   ferry: null,
   parkTicket: null,
   parkActivity: null,
@@ -155,6 +183,17 @@ function toStepError(step: SubmitStep, error: unknown): SubmitStepError {
   };
 }
 
+function computeTripWindow(rooms: RoomSelection[]): TripWindow | null {
+  if (rooms.length === 0) return null;
+  let checkIn = rooms[0].checkIn;
+  let checkOut = rooms[0].checkOut;
+  for (const room of rooms) {
+    if (room.checkIn < checkIn) checkIn = room.checkIn;
+    if (room.checkOut > checkOut) checkOut = room.checkOut;
+  }
+  return { checkIn, checkOut };
+}
+
 export function BookingCartProvider({
   children,
 }: {
@@ -169,6 +208,7 @@ export function BookingCartProvider({
   const [roomAlreadyExists, setRoomAlreadyExists] = useState(false);
   const [existingBookings, setExistingBookings] =
     useState<ExistingReservationBookings>(EMPTY_EXISTING);
+  const [activeStep, setActiveStep] = useState<BookingStep>("room");
 
   // Whenever the customer chooses to attach to an existing reservation,
   // fetch its current confirmed tickets so step pickers can grey out
@@ -197,6 +237,10 @@ export function BookingCartProvider({
         if (cancelled) return;
 
         setExistingBookings({
+          parkBookings: parks.data,
+          beachBookings: beach.data,
+          parkActivityBookings: parkActs.data,
+          ferryBookings: ferry.data,
           parkDates: new Set(
             parks.data.map((b) => `${b.park_id}|${b.date}`),
           ),
@@ -213,8 +257,6 @@ export function BookingCartProvider({
           ),
         });
       } catch {
-        // Best-effort. If the lookup fails the API will still 422 on
-        // submit; UX is mildly worse but the booking can't slip through.
         if (cancelled) return;
         setExistingBookings(EMPTY_EXISTING);
       }
@@ -225,27 +267,29 @@ export function BookingCartProvider({
     };
   }, [attachToReservationId]);
 
-  // Clearing the room booking invalidates every dependent step — the rule is
-  // "room first, then everything else", so no add-on survives without it.
-  // Also drops any cached reservation_id so the next room POST starts fresh.
-  // Editing the room while anchored on an existing reservation drops the
-  // anchor — the user is now describing a new room, not the saved one.
-  const setRoom = useCallback((selection: RoomSelection | null) => {
-    setCart((prev) =>
-      selection === null
-        ? EMPTY_CART
-        : { ...prev, room: selection },
-    );
-    if (selection === null) {
-      setReservationId(null);
-      setAttachToReservationId(null);
-      setRoomAlreadyExists(false);
-    } else if (roomAlreadyExists) {
-      setRoomAlreadyExists(false);
-      setAttachToReservationId(null);
-      setReservationId(null);
-    }
-  }, [roomAlreadyExists]);
+  // Append a room. Anchored mode keeps `roomAlreadyExists` true (added
+  // rooms are still NEW for the API) — only an explicit clearRooms drops
+  // the anchor. The reservation_id, if any, persists across additions.
+  const addRoom = useCallback((selection: RoomSelection) => {
+    setCart((prev) => ({ ...prev, rooms: [...prev.rooms, selection] }));
+  }, []);
+
+  const removeRoom = useCallback((index: number) => {
+    setCart((prev) => ({
+      ...prev,
+      rooms: prev.rooms.filter((_, i) => i !== index),
+    }));
+  }, []);
+
+  // Drop every room and (consequently) every dependent ticket — same
+  // semantics as the old setRoom(null). Also drops anchor + reservation
+  // state because there's no longer a trip to attach things to.
+  const clearRooms = useCallback(() => {
+    setCart(EMPTY_CART);
+    setReservationId(null);
+    setAttachToReservationId(null);
+    setRoomAlreadyExists(false);
+  }, []);
 
   const setFerry = useCallback((selection: FerrySelection | null) => {
     setCart((prev) => ({ ...prev, ferry: selection }));
@@ -280,28 +324,29 @@ export function BookingCartProvider({
     setReservationId(null);
     setAttachToReservationId(null);
     setRoomAlreadyExists(false);
+    setActiveStep("room");
   }, []);
 
   // Anchor the cart on a reservation that already has a confirmed room.
-  // Synthesises cart.room from the chosen room booking so the rest of the
-  // flow (step unlocks, date-window filters, conflict pre-checks) works
-  // exactly as if the user had just confirmed a room — except submitCart
-  // will skip the room POST.
+  // Synthesises a cart room from the chosen room booking (marked with
+  // `existingId`) so the rest of the flow (step unlocks, date filters,
+  // conflict pre-checks) works naturally. submitCart skips POSTing rooms
+  // that carry an existingId.
   const startFromExistingReservation = useCallback(
     (reservation: Reservation, anchor: RoomBooking) => {
-      // The reservations index eager-loads hotel/room_type/room on each
-      // room booking (per API_INTEGRATION.md §10), so these should always
-      // be present. Bail rather than render a half-set cart if not.
       if (!anchor.hotel || !anchor.room_type) return;
 
       setCart({
-        room: {
-          hotel: anchor.hotel,
-          roomType: anchor.room_type,
-          checkIn: anchor.check_in_date,
-          checkOut: anchor.check_out_date,
-          guests: anchor.guests,
-        },
+        rooms: [
+          {
+            hotel: anchor.hotel,
+            roomType: anchor.room_type,
+            checkIn: anchor.check_in_date,
+            checkOut: anchor.check_out_date,
+            guests: anchor.guests,
+            existingId: anchor.id,
+          },
+        ],
         ferry: null,
         parkTicket: null,
         parkActivity: null,
@@ -314,6 +359,12 @@ export function BookingCartProvider({
     [],
   );
 
+  const primaryRoom = cart.rooms[0] ?? null;
+  const tripWindow = useMemo(() => computeTripWindow(cart.rooms), [cart.rooms]);
+  const hasRoom = cart.rooms.length > 0;
+
+  const hasExistingDayPass = existingBookings.parkBookings.length > 0;
+
   const isStepUnlocked = useCallback(
     (step: BookingStep): boolean => {
       switch (step) {
@@ -322,23 +373,23 @@ export function BookingCartProvider({
         case "ferry":
         case "park-ticket":
         case "beach-activity":
-          return cart.room !== null;
+          return hasRoom;
         case "park-activity":
-          return cart.room !== null && cart.parkTicket !== null;
+          return hasRoom && (cart.parkTicket !== null || hasExistingDayPass);
       }
     },
-    [cart.room, cart.parkTicket],
+    [hasRoom, cart.parkTicket, hasExistingDayPass],
   );
 
   const stepLockReason = useCallback(
     (step: BookingStep): string | null => {
       if (isStepUnlocked(step)) return null;
-      if (step === "park-activity" && cart.room !== null) {
+      if (step === "park-activity" && hasRoom) {
         return "Book a theme park ticket first to add park activities.";
       }
       return "Book a room first to unlock this step.";
     },
-    [isStepUnlocked, cart.room],
+    [isStepUnlocked, hasRoom],
   );
 
   const hasAnyAddOn =
@@ -347,12 +398,56 @@ export function BookingCartProvider({
     cart.parkActivity !== null ||
     cart.beachActivity !== null;
 
-  const canBook = cart.room !== null;
+  const canBook = hasRoom;
+
+  // Skip locked steps when navigating — pressing Next on the room step
+  // when no ticket steps are unlocked yet just dead-ends, but with at
+  // least one room confirmed, all single-step deps are satisfied. The
+  // park-activity step can still be locked if no parkTicket; the loop
+  // walks past it to the next valid stop.
+  const findStepIndex = (step: BookingStep) =>
+    STEP_ORDER.indexOf(step);
+
+  const goToNextStep = useCallback(() => {
+    const idx = findStepIndex(activeStep);
+    for (let i = idx + 1; i < STEP_ORDER.length; i++) {
+      if (isStepUnlocked(STEP_ORDER[i])) {
+        setActiveStep(STEP_ORDER[i]);
+        return;
+      }
+    }
+  }, [activeStep, isStepUnlocked]);
+
+  const goToPreviousStep = useCallback(() => {
+    const idx = findStepIndex(activeStep);
+    for (let i = idx - 1; i >= 0; i--) {
+      if (isStepUnlocked(STEP_ORDER[i])) {
+        setActiveStep(STEP_ORDER[i]);
+        return;
+      }
+    }
+  }, [activeStep, isStepUnlocked]);
+
+  const hasPreviousStep = useMemo(() => {
+    const idx = findStepIndex(activeStep);
+    for (let i = idx - 1; i >= 0; i--) {
+      if (isStepUnlocked(STEP_ORDER[i])) return true;
+    }
+    return false;
+  }, [activeStep, isStepUnlocked]);
+
+  const hasNextStep = useMemo(() => {
+    const idx = findStepIndex(activeStep);
+    for (let i = idx + 1; i < STEP_ORDER.length; i++) {
+      if (isStepUnlocked(STEP_ORDER[i])) return true;
+    }
+    return false;
+  }, [activeStep, isStepUnlocked]);
 
   const submitCart = useCallback(async (): Promise<SubmitResult> => {
     const result: SubmitResult = {
       reservationId: null,
-      room: null,
+      rooms: [],
       parkBooking: null,
       parkActivityBooking: null,
       beachBooking: null,
@@ -360,10 +455,10 @@ export function BookingCartProvider({
       errors: [],
     };
 
-    if (!cart.room) {
+    if (cart.rooms.length === 0) {
       result.errors.push({
         step: "room",
-        message: "Confirm a room before sending the booking.",
+        message: "Add at least one room before sending the booking.",
         fieldErrors: {},
       });
       return result;
@@ -371,53 +466,54 @@ export function BookingCartProvider({
 
     setSubmitting(true);
     try {
-      // Step 1: room booking — anchors the reservation. Three cases:
-      //  - Fresh trip: POST without reservation_id, server auto-creates one.
-      //  - Cross-session attach (overlap dialog): POST with reservation_id.
-      //  - Anchored on existing trip (roomAlreadyExists): skip the POST
-      //    entirely; the room is already booked, we just need its
-      //    reservation_id for the ticket POSTs.
-      let rid: number;
+      // Resolve reservation_id. Three entry conditions:
+      //  - Anchored on existing trip → already have an id, skip any
+      //    rooms carrying `existingId` (they're already booked).
+      //  - Cross-session attach (overlap dialog) → start with that id.
+      //  - Fresh trip → first POST creates the reservation, capture its
+      //    id and reuse it for any subsequent rooms.
+      let rid: number | null = attachToReservationId;
 
-      if (roomAlreadyExists) {
-        if (attachToReservationId === null) {
-          // Defensive — startFromExistingReservation always sets both, but
-          // a bad sequence of state edits could land here. Treat it as a
-          // hard error rather than silently posting a fresh room.
-          result.errors.push({
-            step: "room",
-            message:
-              "Anchored on an existing trip but no reservation id is set.",
-            fieldErrors: {},
-          });
-          return result;
-        }
-        rid = attachToReservationId;
-        result.reservationId = rid;
-      } else {
-        let roomBooking: RoomBooking;
+      // Rooms that need a POST. Existing-anchor rooms are skipped.
+      const newRooms = cart.rooms.filter((r) => !r.existingId);
+
+      for (const room of newRooms) {
         try {
           const created = await createRoomBooking({
-            reservation_id: attachToReservationId ?? undefined,
-            room_type_id: cart.room.roomType.id,
-            check_in_date: cart.room.checkIn,
-            check_out_date: cart.room.checkOut,
-            guests: cart.room.guests,
+            reservation_id: rid ?? undefined,
+            room_type_id: room.roomType.id,
+            check_in_date: room.checkIn,
+            check_out_date: room.checkOut,
+            guests: room.guests,
           });
-          roomBooking = created.data;
+          result.rooms.push(created.data);
+          if (rid === null) {
+            rid = created.data.reservation_id;
+            setReservationId(rid);
+          }
         } catch (error) {
           result.errors.push(toStepError("room", error));
-          return result;
+          // First-room failure means we never got a reservation id; the
+          // rest of the pipeline can't run, so abort.
+          if (rid === null) return result;
         }
-
-        result.room = roomBooking;
-        result.reservationId = roomBooking.reservation_id;
-        setReservationId(roomBooking.reservation_id);
-        rid = roomBooking.reservation_id;
       }
 
-      // Step 2: independent tickets in parallel. parkTicket runs on its own
-      // because parkActivity depends on it landing as confirmed first.
+      if (rid === null) {
+        // No new rooms posted AND no anchored reservation_id — would only
+        // happen if every room in cart was anchored but somehow attach id
+        // wasn't set. Treat as hard error.
+        result.errors.push({
+          step: "room",
+          message: "No reservation id could be resolved.",
+          fieldErrors: {},
+        });
+        return result;
+      }
+      result.reservationId = rid;
+
+      // Independent tickets in parallel. parkTicket runs alongside the
+      // others because parkActivity sequentially waits for it below.
       const independent: Array<Promise<void>> = [];
 
       if (cart.parkTicket) {
@@ -475,9 +571,6 @@ export function BookingCartProvider({
 
       await Promise.all(independent);
 
-      // Step 3: park activity. Only attempt when the prerequisite day-pass
-      // landed in this submit (or was already on the reservation — caller
-      // would still have to pre-validate that).
       if (cart.parkActivity) {
         const parkActivitySelection = cart.parkActivity;
         const dayPassLanded =
@@ -491,15 +584,35 @@ export function BookingCartProvider({
             fieldErrors: {},
           });
         } else {
-          try {
-            const res = await createParkActivityBooking({
-              reservation_id: rid,
-              park_activity_schedule_id: parkActivitySelection.schedule.id,
-              guests: parkActivitySelection.guests,
+          const payload = parkActivitySelection.schedule
+            ? {
+                reservation_id: rid,
+                park_activity_schedule_id: parkActivitySelection.schedule.id,
+                guests: parkActivitySelection.guests,
+              }
+            : parkActivitySelection.date
+              ? {
+                  reservation_id: rid,
+                  park_activity_id: parkActivitySelection.activity.id,
+                  date: parkActivitySelection.date,
+                  guests: parkActivitySelection.guests,
+                }
+              : null;
+
+          if (payload === null) {
+            result.errors.push({
+              step: "park-activity",
+              message:
+                "Park activity selection is incomplete — pick a schedule or date.",
+              fieldErrors: {},
             });
-            result.parkActivityBooking = res.data;
-          } catch (error) {
-            result.errors.push(toStepError("park-activity", error));
+          } else {
+            try {
+              const res = await createParkActivityBooking(payload);
+              result.parkActivityBooking = res.data;
+            } catch (error) {
+              result.errors.push(toStepError("park-activity", error));
+            }
           }
         }
       }
@@ -508,7 +621,7 @@ export function BookingCartProvider({
     } finally {
       setSubmitting(false);
     }
-  }, [cart, attachToReservationId, roomAlreadyExists]);
+  }, [cart, attachToReservationId]);
 
   const value = useMemo<BookingCartContextValue>(
     () => ({
@@ -518,7 +631,11 @@ export function BookingCartProvider({
       setAttachToReservationId,
       roomAlreadyExists,
       startFromExistingReservation,
-      setRoom,
+      addRoom,
+      removeRoom,
+      clearRooms,
+      primaryRoom,
+      tripWindow,
       setFerry,
       setParkTicket,
       setParkActivity,
@@ -530,6 +647,12 @@ export function BookingCartProvider({
       submitting,
       submitCart,
       existingBookings,
+      activeStep,
+      setActiveStep,
+      goToNextStep,
+      goToPreviousStep,
+      hasPreviousStep,
+      hasNextStep,
       reset,
     }),
     [
@@ -538,7 +661,11 @@ export function BookingCartProvider({
       attachToReservationId,
       roomAlreadyExists,
       startFromExistingReservation,
-      setRoom,
+      addRoom,
+      removeRoom,
+      clearRooms,
+      primaryRoom,
+      tripWindow,
       setFerry,
       setParkTicket,
       setParkActivity,
@@ -550,6 +677,11 @@ export function BookingCartProvider({
       submitting,
       submitCart,
       existingBookings,
+      activeStep,
+      goToNextStep,
+      goToPreviousStep,
+      hasPreviousStep,
+      hasNextStep,
       reset,
     ],
   );

@@ -347,12 +347,18 @@ export type EffectiveHour = {
 // Room number is NOT carried in the cart — POST /room-bookings picks the
 // lowest-numbered free room of room_type_id server-side. The customer-facing
 // flow only collects hotel + type + window + guest count.
+//
+// `existingId` marks rooms that are already saved on the API. When set,
+// submitCart skips the POST (it's there to anchor the trip / unlock steps,
+// not to be re-created). New rooms added during this session leave it
+// undefined so they get POSTed against the resolved reservation_id.
 export type RoomSelection = {
   hotel: Hotel;
   roomType: RoomType;
   checkIn: string;
   checkOut: string;
   guests: number;
+  existingId?: number;
 };
 
 // `travelDate` is required per DESD-100 (slots are recurring; the date lives
@@ -372,10 +378,16 @@ export type ParkTicketSelection = {
   guests: number;
 };
 
+// DESD-95: two booking shapes. Timed activities require an authored
+// `schedule`; all-day activities (`is_all_day=true`) carry just a `date`
+// and the server materialises the schedule on POST. Exactly one of
+// `schedule` / `date` should be set — the discriminant is the activity's
+// `is_all_day` flag.
 export type ParkActivitySelection = {
   activity: ParkActivity;
-  schedule: ParkActivitySchedule;
   guests: number;
+  schedule?: ParkActivitySchedule;
+  date?: string;
 };
 
 export type BeachActivitySelection = {
@@ -391,8 +403,12 @@ export type BookingStep =
   | "park-activity"
   | "beach-activity";
 
+// Multiple rooms can hang off a single Reservation (§11). The first room
+// anchors the trip (creates the reservation if no `attachToReservationId`),
+// subsequent rooms POST against that reservation_id. Empty array = no
+// rooms picked yet → ticket steps stay locked.
 export type BookingCart = {
-  room: RoomSelection | null;
+  rooms: RoomSelection[];
   ferry: FerrySelection | null;
   parkTicket: ParkTicketSelection | null;
   parkActivity: ParkActivitySelection | null;
