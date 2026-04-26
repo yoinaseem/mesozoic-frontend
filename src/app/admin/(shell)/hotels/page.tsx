@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { HotelIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { Breadcrumbs } from "@/components/admin/Breadcrumbs";
@@ -13,46 +13,88 @@ import { PageHeader } from "@/components/admin/PageHeader";
 import { RowActions, type RowActionItem } from "@/components/admin/RowActions";
 import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { ApiError, toastApiError } from "@/lib/api-client";
-import { deleteHotel, listHotels } from "@/lib/api/hotels";
+import { deleteHotel, getHotel, listHotels } from "@/lib/api/hotels";
+import { listMyHotels } from "@/lib/api/room-bookings";
 import type { Paginated } from "@/types/auth";
 import type { Hotel } from "@/types/booking";
 
 export default function HotelsPage() {
   const router = useRouter();
-  const { hasPermission } = useAuth();
+  const { hasPermission, hasRole, user, loading: authLoading } = useAuth();
   const canCreate = hasPermission("hotels.create");
+  // Hotel-managers (not superadmins) get a scoped list backed by
+  // /auth/me/hotels — superadmins continue to see the global paginated list.
+  const isManagerOnly =
+    hasRole("hotel-manager") && !hasRole("superadmin");
 
   const [page, setPage] = useState(1);
-  const [result, setResult] = useState<Paginated<Hotel> | null>(null);
+  const [rows, setRows] = useState<Hotel[]>([]);
+  const [paginationMeta, setPaginationMeta] = useState<
+    Paginated<Hotel>["meta"] | null
+  >(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [redirecting, setRedirecting] = useState(false);
+  const [reloadTick, setReloadTick] = useState(0);
 
   const [pendingDelete, setPendingDelete] = useState<Hotel | null>(null);
 
-  const load = useCallback(async (nextPage: number) => {
-    setLoading(true);
-    setErrorMessage("");
-    try {
-      const data = await listHotels(nextPage);
-      setResult(data);
-    } catch (error) {
-      if (error instanceof ApiError || error instanceof Error) {
-        setErrorMessage(error.message || "Failed to load hotels.");
-      } else {
-        setErrorMessage("Failed to load hotels.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    void load(page);
-  }, [load, page]);
+    if (authLoading || !user) return;
+    let cancelled = false;
 
-  const rows = result?.data ?? [];
-  const meta = result?.meta;
+    const load = async () => {
+      try {
+        if (isManagerOnly) {
+          const myHotels = await listMyHotels();
+          if (cancelled) return;
+          const scoped = myHotels.data;
+
+          // Single-hotel manager: skip the list entirely, send them straight
+          // to the dashboard for their one hotel.
+          if (scoped.length === 1) {
+            setRedirecting(true);
+            router.replace(`/admin/hotels/${scoped[0].id}`);
+            return;
+          }
+
+          // Pull the full hotel resource for each scoped hotel so the table
+          // has address + the rest of the columns the superadmin view shows.
+          const fullHotels = await Promise.all(
+            scoped.map((h) => getHotel(h.id).then((res) => res.data)),
+          );
+          if (cancelled) return;
+          setRows(fullHotels);
+          setPaginationMeta(null);
+          setErrorMessage("");
+          setLoading(false);
+        } else {
+          const data = await listHotels(page);
+          if (cancelled) return;
+          setRows(data.data);
+          setPaginationMeta(data.meta);
+          setErrorMessage("");
+          setLoading(false);
+        }
+      } catch (error) {
+        if (cancelled) return;
+        if (error instanceof ApiError || error instanceof Error) {
+          setErrorMessage(error.message || "Failed to load hotels.");
+        } else {
+          setErrorMessage("Failed to load hotels.");
+        }
+        setLoading(false);
+      }
+    };
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, user, isManagerOnly, page, router, reloadTick]);
 
   const state = loading
     ? "loading"
@@ -111,11 +153,13 @@ export default function HotelsPage() {
   const emptyState = (
     <EmptyState
       icon={HotelIcon}
-      title="No hotels yet"
+      title={isManagerOnly ? "No hotels assigned" : "No hotels yet"}
       description={
-        canCreate
-          ? "Create the first hotel to get things started."
-          : "Hotels will appear here once an administrator adds them."
+        isManagerOnly
+          ? "Ask a superadmin to assign you to a hotel to manage."
+          : canCreate
+            ? "Create the first hotel to get things started."
+            : "Hotels will appear here once an administrator adds them."
       }
       action={
         canCreate ? (
@@ -136,17 +180,28 @@ export default function HotelsPage() {
       await deleteHotel(pendingDelete.id);
       toast.success(`Deleted ${pendingDelete.name}.`);
       // If we just cleared the last row on a non-first page, step back a page.
-      const shouldStepBack = rows.length === 1 && meta && meta.current_page > 1;
+      const shouldStepBack =
+        paginationMeta &&
+        rows.length === 1 &&
+        paginationMeta.current_page > 1;
       if (shouldStepBack) {
         setPage((p) => Math.max(1, p - 1));
       } else {
-        await load(page);
+        setReloadTick((t) => t + 1);
       }
     } catch (error) {
       toastApiError(error);
       throw error;
     }
   };
+
+  if (redirecting) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Spinner className="size-6" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-4">
@@ -158,7 +213,11 @@ export default function HotelsPage() {
       />
       <PageHeader
         title="Hotels"
-        description="Manage accommodations on the isle."
+        description={
+          isManagerOnly
+            ? "Hotels you manage."
+            : "Manage accommodations on the isle."
+        }
         actions={
           canCreate ? (
             <Button asChild size="sm">
@@ -180,18 +239,18 @@ export default function HotelsPage() {
         errorMessage={errorMessage}
         emptyState={emptyState}
         pagination={
-          meta && meta.last_page > 1 ? (
+          paginationMeta && paginationMeta.last_page > 1 ? (
             <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span>
-                Page {meta.current_page} of {meta.last_page} · {meta.total}{" "}
-                total
+                Page {paginationMeta.current_page} of {paginationMeta.last_page}{" "}
+                · {paginationMeta.total} total
               </span>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={meta.current_page <= 1 || loading}
+                  disabled={paginationMeta.current_page <= 1 || loading}
                 >
                   Previous
                 </Button>
@@ -199,7 +258,10 @@ export default function HotelsPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setPage((p) => p + 1)}
-                  disabled={meta.current_page >= meta.last_page || loading}
+                  disabled={
+                    paginationMeta.current_page >= paginationMeta.last_page ||
+                    loading
+                  }
                 >
                   Next
                 </Button>

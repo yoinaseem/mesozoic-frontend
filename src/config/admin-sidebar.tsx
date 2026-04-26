@@ -6,6 +6,8 @@ import {
   TreePalm,
   Users,
   Receipt,
+  Shield,
+  KeyRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -71,6 +73,25 @@ export const adminNavItems: AdminNavItem[] = [
       { title: "Bookings", url: "/admin/park-bookings" },
       { title: "Activity bookings", url: "/admin/park-activity-bookings" },
     ],
+  },
+  // RBAC group — gated on the superadmin role. The brief specifies
+  // `roles.manage` as the long-term gate, but in practice the seeder grants
+  // it only to superadmin, and role-based gating works regardless of whether
+  // the permission has been seeded yet. Switch to permission-based once the
+  // backend confirms `roles.manage` lands on every superadmin's token.
+  {
+    title: "Roles",
+    url: "/admin/roles",
+    icon: Shield,
+    permission: null,
+    role: "superadmin",
+  },
+  {
+    title: "Permissions",
+    url: "/admin/permissions",
+    icon: KeyRound,
+    permission: null,
+    role: "superadmin",
   },
   {
     title: "Users",

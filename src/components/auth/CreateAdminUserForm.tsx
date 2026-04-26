@@ -49,7 +49,7 @@ export function CreateAdminUserForm() {
         password_confirmation: passwordConfirmation,
       });
 
-      toast.success(`Created ${created.name}.`);
+      toast.success(`Created ${created.data.name}.`);
       setName("");
       setEmail("");
       setPassword("");
