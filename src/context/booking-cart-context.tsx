@@ -73,10 +73,16 @@ export type SubmitResult = {
   errors: SubmitStepError[];
 };
 
-// Conflict sets surfaced to step UIs when attaching to an existing
-// reservation. Each set is keyed in the form the schedule picker can probe
-// directly, so the lookup is O(1) without per-row computation in the step.
+// Existing tickets on the reservation we're attaching to. We carry the
+// full booking arrays (so the summary can render them and the activity
+// step can derive park/date context from a held day-pass) AND the derived
+// conflict sets used by the duplicate pre-check. Conflict sets are keyed
+// in the form the schedule picker probes directly so lookups stay O(1).
 export type ExistingReservationBookings = {
+  parkBookings: ParkBooking[];
+  beachBookings: BeachBooking[];
+  parkActivityBookings: ParkActivityBooking[];
+  ferryBookings: FerryBooking[];
   // `${park_id}|${date}` — park-day-pass uniqueness is per (reservation, park, date).
   parkDates: Set<string>;
   // beach uniqueness is per (reservation, schedule_id) — schedule_id alone suffices.
@@ -89,6 +95,10 @@ export type ExistingReservationBookings = {
 };
 
 const EMPTY_EXISTING: ExistingReservationBookings = {
+  parkBookings: [],
+  beachBookings: [],
+  parkActivityBookings: [],
+  ferryBookings: [],
   parkDates: new Set(),
   beachScheduleIds: new Set(),
   parkActivityScheduleIds: new Set(),
@@ -197,6 +207,10 @@ export function BookingCartProvider({
         if (cancelled) return;
 
         setExistingBookings({
+          parkBookings: parks.data,
+          beachBookings: beach.data,
+          parkActivityBookings: parkActs.data,
+          ferryBookings: ferry.data,
           parkDates: new Set(
             parks.data.map((b) => `${b.park_id}|${b.date}`),
           ),
@@ -314,6 +328,12 @@ export function BookingCartProvider({
     [],
   );
 
+  // park-activity also unlocks when an existing day-pass is already on the
+  // attached reservation — the API's prerequisite is a confirmed ParkBooking
+  // on the reservation (§14), and that's satisfied either by an in-cart
+  // ticket about to be POSTed or by one already on the trip.
+  const hasExistingDayPass = existingBookings.parkBookings.length > 0;
+
   const isStepUnlocked = useCallback(
     (step: BookingStep): boolean => {
       switch (step) {
@@ -324,10 +344,13 @@ export function BookingCartProvider({
         case "beach-activity":
           return cart.room !== null;
         case "park-activity":
-          return cart.room !== null && cart.parkTicket !== null;
+          return (
+            cart.room !== null &&
+            (cart.parkTicket !== null || hasExistingDayPass)
+          );
       }
     },
-    [cart.room, cart.parkTicket],
+    [cart.room, cart.parkTicket, hasExistingDayPass],
   );
 
   const stepLockReason = useCallback(

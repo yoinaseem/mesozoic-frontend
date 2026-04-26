@@ -29,8 +29,22 @@ function Line({ label, value }: { label: string; value: string }) {
 
 export function BookingSummary() {
   const router = useRouter();
-  const { cart, canBook, hasAnyAddOn, submitting, submitCart, reset } =
-    useBookingCart();
+  const {
+    cart,
+    canBook,
+    hasAnyAddOn,
+    submitting,
+    submitCart,
+    reset,
+    existingBookings,
+    roomAlreadyExists,
+  } = useBookingCart();
+
+  const hasExisting =
+    existingBookings.parkBookings.length > 0 ||
+    existingBookings.beachBookings.length > 0 ||
+    existingBookings.parkActivityBookings.length > 0 ||
+    existingBookings.ferryBookings.length > 0;
 
   const [lastResult, setLastResult] = useState<SubmitResult | null>(null);
 
@@ -70,7 +84,14 @@ export function BookingSummary() {
       </header>
 
       <section className="space-y-2">
-        <h4 className="text-base-color text-sm font-semibold">Room</h4>
+        <h4 className="text-base-color text-sm font-semibold">
+          Room
+          {roomAlreadyExists ? (
+            <span className="text-muted ml-2 text-xs font-normal">
+              (already on this trip)
+            </span>
+          ) : null}
+        </h4>
         {cart.room ? (
           <div className="space-y-1">
             <Line label="Hotel" value={cart.room.hotel.name} />
@@ -85,6 +106,64 @@ export function BookingSummary() {
           <p className="text-muted text-sm">Not selected</p>
         )}
       </section>
+
+      {hasExisting ? (
+        <section className="border-base bg-base/30 space-y-3 rounded-lg border border-dashed p-3">
+          <h4 className="text-base-color text-sm font-semibold">
+            Already on this trip
+          </h4>
+          {existingBookings.parkBookings.map((b) => (
+            <div key={`pb-${b.id}`} className="space-y-0.5">
+              <p className="text-base-color text-xs font-semibold">
+                Park ticket
+              </p>
+              <Line
+                label={b.park?.name ?? `Park #${b.park_id}`}
+                value={`${b.date} · ${b.guests} guest${
+                  b.guests === 1 ? "" : "s"
+                }`}
+              />
+            </div>
+          ))}
+          {existingBookings.parkActivityBookings.map((b) => (
+            <div key={`pab-${b.id}`} className="space-y-0.5">
+              <p className="text-base-color text-xs font-semibold">
+                Park activity
+              </p>
+              <Line
+                label={b.schedule?.activity?.name ?? "Activity"}
+                value={`${b.schedule?.date ?? "—"} · ${b.guests} guest${
+                  b.guests === 1 ? "" : "s"
+                }`}
+              />
+            </div>
+          ))}
+          {existingBookings.beachBookings.map((b) => (
+            <div key={`bb-${b.id}`} className="space-y-0.5">
+              <p className="text-base-color text-xs font-semibold">
+                Beach activity
+              </p>
+              <Line
+                label={b.schedule?.activity?.name ?? "Activity"}
+                value={`${b.schedule?.activity_date ?? "—"} · ${
+                  b.guests
+                } guest${b.guests === 1 ? "" : "s"}`}
+              />
+            </div>
+          ))}
+          {existingBookings.ferryBookings.map((b) => (
+            <div key={`fb-${b.id}`} className="space-y-0.5">
+              <p className="text-base-color text-xs font-semibold">Ferry</p>
+              <Line
+                label={b.schedule?.ferry?.name ?? "Ferry"}
+                value={`${b.travel_date} · ${b.guests} passenger${
+                  b.guests === 1 ? "" : "s"
+                }`}
+              />
+            </div>
+          ))}
+        </section>
+      ) : null}
 
       {cart.ferry ? (
         <section className="space-y-2">

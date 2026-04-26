@@ -11,9 +11,23 @@ import type { ParkActivity, ParkActivitySchedule } from "@/types/booking";
 
 export function ParkActivityStep() {
   const { cart, setParkActivity, existingBookings } = useBookingCart();
-  const park = cart.parkTicket?.park ?? null;
-  const parkTicket = cart.parkTicket;
   const room = cart.room;
+  const cartParkTicket = cart.parkTicket;
+  // When the user is anchored on an existing reservation that already has
+  // a confirmed day-pass, derive the park + visit-date context from it so
+  // activities for that day-pass can still be booked. Cart ticket wins
+  // when both exist (the just-added ticket is what they're working on).
+  const fallbackExistingPass = existingBookings.parkBookings[0] ?? null;
+  const effectiveParkId =
+    cartParkTicket?.park.id ?? fallbackExistingPass?.park_id ?? null;
+  const effectiveDate =
+    cartParkTicket?.visitDate ?? fallbackExistingPass?.date ?? null;
+  const effectiveParkName =
+    cartParkTicket?.park.name ??
+    fallbackExistingPass?.park?.name ??
+    (effectiveParkId !== null ? `Park #${effectiveParkId}` : null);
+  const effectiveTicketGuests =
+    cartParkTicket?.guests ?? fallbackExistingPass?.guests ?? null;
 
   const [activities, setActivities] = useState<ParkActivity[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
@@ -28,18 +42,18 @@ export function ParkActivityStep() {
   );
 
   const [guests, setGuests] = useState<number>(
-    cart.parkActivity?.guests ?? cart.parkTicket?.guests ?? 1,
+    cart.parkActivity?.guests ?? effectiveTicketGuests ?? 1,
   );
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!park) {
+    if (effectiveParkId === null) {
       setActivities([]);
       return;
     }
     let cancelled = false;
     setLoadingActivities(true);
-    listParkActivities(park.id)
+    listParkActivities(effectiveParkId)
       .then((res) => {
         if (cancelled) return;
         setActivities(res.data);
@@ -52,16 +66,16 @@ export function ParkActivityStep() {
     return () => {
       cancelled = true;
     };
-  }, [park]);
+  }, [effectiveParkId]);
 
   useEffect(() => {
-    if (!park || selectedActivityId === null) {
+    if (effectiveParkId === null || selectedActivityId === null) {
       setSchedules([]);
       return;
     }
     let cancelled = false;
     setLoadingSchedules(true);
-    listParkActivitySchedules(park.id, selectedActivityId)
+    listParkActivitySchedules(effectiveParkId, selectedActivityId)
       .then((res) => {
         if (cancelled) return;
         setSchedules(res.data);
@@ -74,7 +88,7 @@ export function ParkActivityStep() {
     return () => {
       cancelled = true;
     };
-  }, [park, selectedActivityId]);
+  }, [effectiveParkId, selectedActivityId]);
 
   // The day-pass coupling rule (§14): activity date must match the held
   // park ticket's date. The room-window check is also enforced because the
@@ -82,14 +96,14 @@ export function ParkActivityStep() {
   const bookableSchedules = useMemo(() => {
     return schedules.filter((s) => {
       if (s.status !== "scheduled") return false;
-      if (parkTicket && s.date !== parkTicket.visitDate) return false;
+      if (effectiveDate && s.date !== effectiveDate) return false;
       if (room) {
         if (s.date < room.checkIn) return false;
         if (s.date >= room.checkOut) return false;
       }
       return true;
     });
-  }, [schedules, parkTicket, room]);
+  }, [schedules, effectiveDate, room]);
 
   const selectedActivity =
     activities.find((a) => a.id === selectedActivityId) ?? null;
@@ -129,9 +143,16 @@ export function ParkActivityStep() {
           Park activities
         </h2>
         <p className="text-muted text-sm">
-          {park
-            ? `Add-on experiences inside ${park.name}.`
+          {effectiveParkName
+            ? `Add-on experiences inside ${effectiveParkName}${
+                effectiveDate ? ` on ${effectiveDate}` : ""
+              }.`
             : "Pick a park ticket first to see available activities."}
+          {!cartParkTicket && fallbackExistingPass ? (
+            <span className="block text-xs">
+              Using your existing day-pass on this trip.
+            </span>
+          ) : null}
         </p>
       </header>
 
@@ -194,8 +215,8 @@ export function ParkActivityStep() {
             <p className="text-muted text-sm">Loading slots…</p>
           ) : bookableSchedules.length === 0 ? (
             <p className="text-muted text-sm">
-              {parkTicket
-                ? `No slots for ${parkTicket.visitDate} on this activity. Pick a different activity or adjust your park ticket date.`
+              {effectiveDate
+                ? `No slots for ${effectiveDate} on this activity. Pick a different activity or adjust your park ticket date.`
                 : "No upcoming slots scheduled."}
             </p>
           ) : (
