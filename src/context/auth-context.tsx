@@ -16,6 +16,7 @@ type AuthContextValue = {
   register: (payload: RegisterPayload) => Promise<AuthUser>;
   logout: () => Promise<void>;
   clearAuth: () => void;
+  refreshUser: () => Promise<AuthUser | null>;
   hasRole: (role: string) => boolean;
   hasPermission: (permission: string) => boolean;
 };
@@ -86,6 +87,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [applySession]
   );
 
+  const refreshUser = useCallback(async () => {
+    if (!tokenRef.current) return null;
+    try {
+      const next = await authApi.me(tokenRef.current);
+      setUser(next);
+      return next;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     setLoading(true);
     try {
@@ -155,10 +167,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       register,
       logout,
       clearAuth,
+      refreshUser,
       hasRole,
       hasPermission,
     }),
-    [token, user, loading, login, register, logout, clearAuth, hasRole, hasPermission]
+    [token, user, loading, login, register, logout, clearAuth, refreshUser, hasRole, hasPermission]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
