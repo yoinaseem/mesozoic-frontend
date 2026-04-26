@@ -85,7 +85,7 @@ export default function EditFerryTypePage({
         <Breadcrumbs
           items={[
             { label: "Dashboard", href: "/admin/dashboard" },
-            { label: "Ferry types", href: "/admin/ferry-types" },
+            { label: "Ferries", href: "/admin/ferries" },
             { label: ferryType.name },
             { label: "Edit" },
           ]}

@@ -8,6 +8,7 @@ import { Breadcrumbs } from "@/components/admin/Breadcrumbs";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { FerryArchiveConfirm } from "@/components/admin/ferry/FerryArchiveConfirm";
 import { FerryDashboardHeader } from "@/components/admin/ferry/FerryDashboardHeader";
+import { FerryDialog, type FerryDialogMode } from "@/components/admin/ferry/FerryDialog";
 import { FerrySlotsSection } from "@/components/admin/ferry/FerrySlotsSection";
 import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
@@ -63,6 +64,10 @@ export default function FerryDashboardPage({
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [cascadeConflict, setCascadeConflict] =
     useState<BlockingBookingsConflict | null>(null);
+  // Edit dialog state — name-only edit mirrors how rooms are edited inside
+  // the room-types panel (no separate edit page).
+  const [editDialogMode, setEditDialogMode] =
+    useState<FerryDialogMode | null>(null);
   // Bumped after slot mutations so the schedules_count card refreshes.
   const [tick, setTick] = useState(0);
 
@@ -166,7 +171,13 @@ export default function FerryDashboardPage({
       />
       <FerryDashboardHeader
         ferry={ferry}
-        onEdit={() => router.push(`/admin/ferries/${ferry.id}/edit`)}
+        onEdit={() =>
+          setEditDialogMode({
+            kind: "edit",
+            ferryId: ferry.id,
+            initialName: ferry.name,
+          })
+        }
         onArchive={() => setShowArchiveConfirm(true)}
       />
 
@@ -215,6 +226,19 @@ export default function FerryDashboardPage({
         resourceLabel={`ferry ${ferry.name}`}
         conflict={cascadeConflict}
         onConfirm={handleCascade}
+      />
+
+      <FerryDialog
+        open={editDialogMode !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditDialogMode(null);
+        }}
+        ferryTypeId={ferry.ferry_type_id}
+        mode={editDialogMode ?? { kind: "create" }}
+        onSuccess={() => {
+          setEditDialogMode(null);
+          void load();
+        }}
       />
     </div>
   );

@@ -96,11 +96,11 @@ export function FerryTypeForm({ mode }: Props) {
       if (mode.kind === "create") {
         const res = await createFerryType(buildPayload());
         toast.success(`Created ${res.data.name}.`);
-        router.push("/admin/ferry-types");
+        router.push("/admin/ferries");
       } else {
         const res = await updateFerryType(mode.initial.id, buildDiff());
         toast.success(`Updated ${res.data.name}.`);
-        router.push("/admin/ferry-types");
+        router.push("/admin/ferries");
       }
     } catch (error) {
       setFromApiError(error);
@@ -132,7 +132,7 @@ export function FerryTypeForm({ mode }: Props) {
       isSubmitting={submitting}
       formError={formError}
       onSubmit={onSubmit}
-      onCancel={() => router.push("/admin/ferry-types")}
+      onCancel={() => router.push("/admin/ferries")}
     >
       <FormField label="Name" name="name" errors={fieldErrors} required>
         <Input

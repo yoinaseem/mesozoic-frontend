@@ -41,7 +41,6 @@ export const adminNavItems: AdminNavItem[] = [
     icon: Ship,
     permission: "ferry.view",
     items: [
-      { title: "Types", url: "/admin/ferry-types" },
       { title: "Ferries", url: "/admin/ferries" },
       { title: "Slots", url: "/admin/ferry-schedules" },
       { title: "Bookings", url: "/admin/ferry-bookings" },
