@@ -238,17 +238,17 @@ export type ReservationBookingsSummary = {
 };
 
 // Full reservation shape returned by GET /reservations and GET /reservations/{id}.
-// `status`, `total_amount`, and `bookings_summary` are pending backend work
-// (see RESERVATIONS_BACKEND_BRIEF.md) — typed as optional so the UI degrades
-// gracefully until they ship.
+// `status`, `total_amount`, and `bookings_summary` are derived server-side and
+// always present on direct responses. They're stripped from EMBEDDED payloads
+// (e.g. `RoomBooking.reservation`) — those use `ReservationSummary` instead.
 export type Reservation = {
   id: number;
   user_id: number;
   user?: AuthUser;
   room_bookings?: RoomBooking[];
-  status?: ReservationStatus;
-  total_amount?: string;
-  bookings_summary?: ReservationBookingsSummary;
+  status: ReservationStatus;
+  total_amount: string;
+  bookings_summary: ReservationBookingsSummary;
   created_at: string;
   updated_at: string;
 };

@@ -4,6 +4,7 @@ import { format, parseISO } from "date-fns";
 import { use, useEffect, useState, type ReactNode } from "react";
 import {
   BedIcon,
+  ShipIcon,
   TicketIcon,
   TreePalmIcon,
   UmbrellaIcon,
@@ -23,6 +24,10 @@ import { useAuth } from "@/context/auth-context";
 import { ApiError, toastApiError } from "@/lib/api-client";
 import { cancelBeachBooking, listBeachBookings } from "@/lib/api/beach-bookings";
 import {
+  cancelFerryBooking,
+  listFerryBookings,
+} from "@/lib/api/ferry-bookings";
+import {
   cancelParkActivityBooking,
   listParkActivityBookings,
 } from "@/lib/api/park-activity-bookings";
@@ -32,6 +37,7 @@ import { cancelRoomBooking } from "@/lib/api/room-bookings";
 import type { Paginated } from "@/types/auth";
 import type {
   BeachBooking,
+  FerryBooking,
   ParkActivityBooking,
   ParkBooking,
   Reservation,
@@ -58,7 +64,7 @@ async function fetchAllPages<T>(
   return collected;
 }
 
-type CancelKind = "room" | "park" | "beach" | "activity";
+type CancelKind = "room" | "park" | "beach" | "activity" | "ferry";
 
 type PendingCancel = {
   kind: CancelKind;
@@ -70,6 +76,7 @@ const CANCEL_LABEL: Record<CancelKind, string> = {
   park: "park day-pass",
   beach: "beach booking",
   activity: "park activity booking",
+  ferry: "ferry booking",
 };
 
 function formatDate(iso: string): string {
@@ -90,25 +97,6 @@ function formatPrice(value: string | null | undefined): string {
   const n = parseFloat(value);
   if (Number.isNaN(n)) return "—";
   return `$${n.toFixed(2)}`;
-}
-
-function deriveStatus(rooms: RoomBooking[]): ReservationStatus {
-  if (rooms.length === 0) return "active";
-  const confirmed = rooms.filter((r) => r.status === "confirmed").length;
-  if (confirmed === 0) return "cancelled";
-  if (confirmed === rooms.length) return "active";
-  return "partial";
-}
-
-function deriveRoomTotal(rooms: RoomBooking[]): string | null {
-  const confirmed = rooms.filter((r) => r.status === "confirmed");
-  if (confirmed.length === 0) return null;
-  let sum = 0;
-  for (const r of confirmed) {
-    const n = parseFloat(r.total_price);
-    if (!Number.isNaN(n)) sum += n;
-  }
-  return sum.toFixed(2);
 }
 
 function statusVariant(
@@ -196,6 +184,12 @@ export default function ReservationDetailPage({
   >(null);
   const [activityLoading, setActivityLoading] = useState(true);
   const [activityError, setActivityError] = useState("");
+
+  const [ferryBookings, setFerryBookings] = useState<FerryBooking[] | null>(
+    null,
+  );
+  const [ferryLoading, setFerryLoading] = useState(true);
+  const [ferryError, setFerryError] = useState("");
 
   const [pendingCancel, setPendingCancel] = useState<PendingCancel | null>(
     null,
@@ -306,6 +300,33 @@ export default function ReservationDetailPage({
     };
   }, [reservationId, invalidId, reloadTick]);
 
+  useEffect(() => {
+    if (invalidId) return;
+    let cancelled = false;
+    fetchAllPages((page) =>
+      listFerryBookings({ reservation_id: reservationId, page }),
+    )
+      .then((rows) => {
+        if (cancelled) return;
+        setFerryBookings(rows);
+        setFerryError("");
+        setFerryLoading(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setFerryError(
+          err instanceof Error
+            ? err.message
+            : "Failed to load ferry bookings.",
+        );
+        setFerryBookings(null);
+        setFerryLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reservationId, invalidId, reloadTick]);
+
   const confirmCancel = async () => {
     if (!pendingCancel) return;
     const { kind, id: bookingId } = pendingCancel;
@@ -314,6 +335,7 @@ export default function ReservationDetailPage({
       else if (kind === "park") await cancelParkBooking(bookingId);
       else if (kind === "beach") await cancelBeachBooking(bookingId);
       else if (kind === "activity") await cancelParkActivityBooking(bookingId);
+      else if (kind === "ferry") await cancelFerryBooking(bookingId);
       toast.success(`Cancelled ${CANCEL_LABEL[kind]} #${bookingId}.`);
       setReloadTick((t) => t + 1);
     } catch (err) {
@@ -356,16 +378,15 @@ export default function ReservationDetailPage({
 
   const rooms = reservation.room_bookings ?? [];
   const summary = reservation.bookings_summary;
-  const status = reservation.status ?? deriveStatus(rooms);
+  const status = reservation.status;
 
-  const roomsCount = summary?.rooms ?? rooms.length;
-  const parkCount = summary?.park ?? parkBookings?.length ?? 0;
-  const beachCount = summary?.beach ?? beachBookings?.length ?? 0;
-  const activityCount = summary?.activity ?? activityBookings?.length ?? 0;
+  const roomsCount = summary.rooms;
+  const parkCount = summary.park;
+  const beachCount = summary.beach;
+  const activityCount = summary.activity;
+  const ferryCount = summary.ferry;
 
-  const totalSource = reservation.total_amount ?? deriveRoomTotal(rooms);
-  const totalDisplay = totalSource != null ? formatPrice(totalSource) : null;
-  const totalIsPartial = reservation.total_amount == null && totalSource != null;
+  const totalDisplay = formatPrice(reservation.total_amount);
 
   // Column definitions per section. Inlined here so the page reads top-to-bottom.
 
@@ -546,6 +567,66 @@ export default function ReservationDetailPage({
     },
   ];
 
+  const ferryColumns: DataTableColumn<FerryBooking>[] = [
+    {
+      key: "ferry",
+      header: "Ferry",
+      cell: (b) => (
+        <span className="font-medium">
+          {b.schedule?.ferry?.name ?? `#${b.ferry_schedule_id}`}
+        </span>
+      ),
+    },
+    {
+      key: "route",
+      header: "Route",
+      cell: (b) =>
+        b.schedule
+          ? `${b.schedule.departure_port} → ${b.schedule.arrival_port}`
+          : "—",
+    },
+    {
+      key: "when",
+      header: "When",
+      cell: (b) => formatDateTime(b.travel_date, b.schedule?.departure_time),
+    },
+    {
+      key: "guests",
+      header: "Guests",
+      cell: (b) => b.guests,
+      headClassName: "w-[5rem]",
+    },
+    {
+      key: "total",
+      header: "Total",
+      cell: (b) => formatPrice(b.total_price),
+      headClassName: "w-[7rem]",
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (b) => bookingStatusBadge(b.status),
+      headClassName: "w-[7rem]",
+    },
+    {
+      key: "actions",
+      header: <span className="sr-only">Actions</span>,
+      className: "text-right",
+      cell: (b) => {
+        const items: RowActionItem[] = [];
+        if (canCancel && b.status === "confirmed") {
+          items.push({
+            label: "Cancel booking",
+            icon: XCircleIcon,
+            variant: "destructive",
+            onSelect: () => setPendingCancel({ kind: "ferry", id: b.id }),
+          });
+        }
+        return <RowActions items={items} />;
+      },
+    },
+  ];
+
   const activityColumns: DataTableColumn<ParkActivityBooking>[] = [
     {
       key: "activity",
@@ -639,21 +720,20 @@ export default function ReservationDetailPage({
             </div>
           )}
         </div>
-        {totalDisplay ? (
-          <div className="text-right">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              {totalIsPartial ? "Rooms total" : "Total"}
-            </div>
-            <div className="mt-1 text-2xl font-semibold">{totalDisplay}</div>
+        <div className="text-right">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">
+            Total
           </div>
-        ) : null}
+          <div className="mt-1 text-2xl font-semibold">{totalDisplay}</div>
+        </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="Rooms" value={roomsCount} />
         <StatCard label="Park passes" value={parkCount} />
         <StatCard label="Beach activities" value={beachCount} />
         <StatCard label="Park activities" value={activityCount} />
+        <StatCard label="Ferries" value={ferryCount} />
       </div>
 
       <section className="flex flex-col gap-2">
@@ -734,6 +814,28 @@ export default function ReservationDetailPage({
               icon={TreePalmIcon}
               title="No park activities"
               description="No theme-park activity sessions attached to this reservation."
+            />
+          }
+        />
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-base font-semibold">Ferries</h2>
+        <DataTable<FerryBooking>
+          columns={ferryColumns}
+          rows={ferryBookings ?? []}
+          state={sectionState({
+            loading: ferryLoading,
+            error: ferryError,
+            rows: ferryBookings,
+          })}
+          getRowId={(b) => b.id}
+          errorMessage={ferryError || undefined}
+          emptyState={
+            <EmptyState
+              icon={ShipIcon}
+              title="No ferry bookings"
+              description="No ferry trips attached to this reservation."
             />
           }
         />

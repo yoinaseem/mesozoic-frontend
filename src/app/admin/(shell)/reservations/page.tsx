@@ -31,6 +31,11 @@ import type {
   RoomBooking,
 } from "@/types/booking";
 
+// Note: `status`, `total_amount`, and `bookings_summary` are guaranteed to be
+// present on rows fetched directly from `/reservations`. They're omitted on
+// embedded payloads (e.g. RoomBooking.reservation), but those don't render
+// here — the index endpoint is authoritative, so no fallbacks are needed.
+
 const ALL_VALUE = "__all";
 
 type FilterSelectProps = {
@@ -117,16 +122,9 @@ function isReservationStatus(value: string): value is ReservationStatus {
   return value === "active" || value === "partial" || value === "cancelled";
 }
 
-// Computed-from-room_bookings fallbacks for when the backend hasn't yet
-// shipped status / total_amount / bookings_summary.
-function deriveStatus(rooms: RoomBooking[]): ReservationStatus {
-  if (rooms.length === 0) return "active";
-  const confirmed = rooms.filter((r) => r.status === "confirmed").length;
-  if (confirmed === 0) return "cancelled";
-  if (confirmed === rooms.length) return "active";
-  return "partial";
-}
-
+// Trip dates and hotel names aren't on ReservationResource — the backend only
+// ships counts in `bookings_summary`. We still derive these two display-only
+// columns from the embedded `room_bookings` array.
 function deriveTripDates(rooms: RoomBooking[]): string | null {
   const confirmed = rooms.filter((r) => r.status === "confirmed");
   if (confirmed.length === 0) return null;
@@ -142,20 +140,6 @@ function deriveHotels(rooms: RoomBooking[]): string[] {
     if (!seen.has(name)) seen.add(name);
   }
   return Array.from(seen);
-}
-
-// Partial fallback when the backend hasn't shipped `total_amount` yet (Ask 3).
-// Sums confirmed room-booking totals only — tickets aren't on the eager-load,
-// so this is rooms-subtotal until the backend total lands.
-function deriveRoomTotal(rooms: RoomBooking[]): string | null {
-  const confirmed = rooms.filter((r) => r.status === "confirmed");
-  if (confirmed.length === 0) return null;
-  let sum = 0;
-  for (const r of confirmed) {
-    const n = parseFloat(r.total_price);
-    if (!Number.isNaN(n)) sum += n;
-  }
-  return sum.toFixed(2);
 }
 
 function statusVariant(
@@ -358,20 +342,12 @@ export default function ReservationsPage() {
       key: "bookings",
       header: "Bookings",
       cell: (r) => {
-        if (r.bookings_summary) {
-          const s = r.bookings_summary;
-          const tickets = s.park + s.beach + s.activity + s.ferry;
-          return (
-            <span className="text-sm">
-              {s.rooms} room{s.rooms === 1 ? "" : "s"} · {tickets} ticket
-              {tickets === 1 ? "" : "s"}
-            </span>
-          );
-        }
-        const rooms = (r.room_bookings ?? []).length;
+        const s = r.bookings_summary;
+        const tickets = s.park + s.beach + s.activity + s.ferry;
         return (
-          <span className="text-sm text-muted-foreground">
-            {rooms} room{rooms === 1 ? "" : "s"}
+          <span className="text-sm">
+            {s.rooms} room{s.rooms === 1 ? "" : "s"} · {tickets} ticket
+            {tickets === 1 ? "" : "s"}
           </span>
         );
       },
@@ -379,19 +355,17 @@ export default function ReservationsPage() {
     {
       key: "total",
       header: "Total",
-      cell: (r) => {
-        const total = r.total_amount ?? deriveRoomTotal(r.room_bookings ?? []);
-        return formatPrice(total);
-      },
+      cell: (r) => formatPrice(r.total_amount),
       headClassName: "w-[7rem]",
     },
     {
       key: "status",
       header: "Status",
-      cell: (r) => {
-        const s = r.status ?? deriveStatus(r.room_bookings ?? []);
-        return <StatusBadge variant={statusVariant(s)}>{statusLabel(s)}</StatusBadge>;
-      },
+      cell: (r) => (
+        <StatusBadge variant={statusVariant(r.status)}>
+          {statusLabel(r.status)}
+        </StatusBadge>
+      ),
       headClassName: "w-[7rem]",
     },
   ];
