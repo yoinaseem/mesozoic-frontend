@@ -38,31 +38,67 @@ export type Hotel = {
   updated_at: string;
 };
 
-export type Ferry = {
+// DESD-100 ferry domain redesign:
+// - FerryType is the catalogue (price + capacity live here)
+// - Ferry is a vessel under a type (name + ferry_type_id only; inherits price/capacity)
+// - FerrySchedule is a recurring slot on a vessel (no per-trip date, no status)
+// All three soft-delete; DELETE is archive + hybrid 409 / on_conflict=cascade.
+
+export type FerryType = {
   id: number;
   name: string;
   description: string | null;
-  price: string;
-  capacity: number;
   image: string | null;
-  schedules?: FerrySchedule[];
+  capacity: number;
+  price: number;
+  ferries?: Ferry[];
+  ferries_count?: number;
   created_at: string;
   updated_at: string;
 };
 
-export type FerryScheduleStatus = "scheduled" | "completed" | "cancelled";
+export type Ferry = {
+  id: number;
+  ferry_type_id: number;
+  name: string;
+  ferry_type?: FerryType;
+  schedules?: FerrySchedule[];
+  schedules_count?: number;
+  created_at: string;
+  updated_at: string;
+};
 
+// DESD-100: schedules are fixed slots, not per-trip rows. No travel_date,
+// no arrival_date, no per-trip status. The date lives on FerryBooking.
 export type FerrySchedule = {
   id: number;
   ferry_id: number;
-  travel_date: string;
   departure_time: string;
-  arrival_date: string;
   arrival_time: string;
   departure_port: string;
   arrival_port: string;
-  status: FerryScheduleStatus;
   ferry?: Ferry;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FerryBookingStatus = "confirmed" | "cancelled";
+
+export type FerryBooking = {
+  id: number;
+  reservation_id: number;
+  ferry_schedule_id: number;
+  travel_date: string;
+  guests: number;
+  status: FerryBookingStatus;
+  price_per_guest: string;
+  total_price: string;
+  cancelled_at: string | null;
+  reservation?: ReservationSummary;
+  // Note: schedule may reference a soft-deleted slot (server uses
+  // withTrashed() on booking eager-loads so cancellation history keeps
+  // serialising the chain it ran against).
+  schedule?: FerrySchedule;
   created_at: string;
   updated_at: string;
 };

@@ -1,19 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+// TODO(DESD-100): full re-implementation needed. Slots are now recurring (no
+// per-trip date / status), so the customer flow needs its own travel-date
+// picker. This file is patched to compile against the new types only — the
+// removed-column UI is a placeholder until the proper re-build lands.
+
+import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { useBookingCart } from "@/context/booking-cart-context";
 import { listFerries, listFerrySchedules } from "@/lib/api/ferries";
 import type { Ferry, FerrySchedule } from "@/types/booking";
-
-function formatDateDdMmYyyy(date: string): string {
-  const dateOnly = date.split("T")[0];
-  const parts = dateOnly.split("-");
-  if (parts.length === 3) {
-    return `${parts[2]}-${parts[1]}-${parts[0]}`;
-  }
-  return date;
-}
 
 export function FerryStep() {
   const { cart, setFerry } = useBookingCart();
@@ -75,14 +71,16 @@ export function FerryStep() {
     };
   }, [selectedFerryId]);
 
-  const bookableSchedules = useMemo(
-    () => schedules.filter((s) => s.status === "scheduled"),
-    [schedules],
-  );
+  // DESD-100: slots are no longer per-trip rows with a status; every returned
+  // slot is bookable (the date is picked at booking time, not authored here).
+  const bookableSchedules = schedules;
 
   const selectedFerry = ferries.find((f) => f.id === selectedFerryId) ?? null;
   const selectedSchedule =
     schedules.find((s) => s.id === selectedScheduleId) ?? null;
+
+  // Capacity + price live on the ferry type post-DESD-100; vessels inherit them.
+  const ferryCapacity = selectedFerry?.ferry_type?.capacity ?? 0;
 
   const handleConfirm = () => {
     setError(null);
@@ -94,8 +92,8 @@ export function FerryStep() {
       setError("At least one passenger is required.");
       return;
     }
-    if (passengers > selectedFerry.capacity) {
-      setError(`This ferry carries up to ${selectedFerry.capacity} passengers.`);
+    if (ferryCapacity > 0 && passengers > ferryCapacity) {
+      setError(`This ferry carries up to ${ferryCapacity} passengers.`);
       return;
     }
     setFerry({ ferry: selectedFerry, schedule: selectedSchedule, passengers });
@@ -140,7 +138,9 @@ export function FerryStep() {
                 >
                   <p className="font-semibold text-primary">{ferry.name}</p>
                   <p className="text-muted mt-1 text-sm">
-                    Capacity {ferry.capacity} · ${ferry.price}/seat
+                    {ferry.ferry_type
+                      ? `Capacity ${ferry.ferry_type.capacity} · $${ferry.ferry_type.price}/seat`
+                      : "Capacity / price unavailable"}
                   </p>
                 </button>
               );
@@ -165,9 +165,7 @@ export function FerryStep() {
               <table className="w-full text-left text-sm">
                 <thead className="bg-base text-muted text-xs uppercase tracking-wide">
                   <tr>
-                    <th className="px-3 py-2">Departure Date</th>
                     <th className="px-3 py-2">Departure Time</th>
-                    <th className="px-3 py-2">Arrival Date</th>
                     <th className="px-3 py-2">Arrival Time</th>
                     <th className="px-3 py-2">Route</th>
                     <th className="px-3 py-2" />
@@ -183,16 +181,8 @@ export function FerryStep() {
                           active ? "bg-primary/5" : ""
                         }`}
                       >
-                        <td className="px-3 py-2">
-                          {formatDateDdMmYyyy(s.travel_date)}
-                        </td>
                         <td className="px-3 py-2">{s.departure_time}</td>
-                        <td className="px-3 py-2">
-                          {formatDateDdMmYyyy(s.arrival_date)}
-                        </td>
-                        <td className="px-3 py-2">
-                          {s.arrival_time}
-                        </td>
+                        <td className="px-3 py-2">{s.arrival_time}</td>
                         <td className="px-3 py-2">
                           {s.departure_port} → {s.arrival_port}
                         </td>
@@ -231,7 +221,7 @@ export function FerryStep() {
           id="ferry-passengers"
           type="number"
           min={1}
-          max={selectedFerry?.capacity ?? 100}
+          max={ferryCapacity || 100}
           className="mt-2"
           value={passengers}
           onChange={(e) => setPassengers(Number(e.target.value))}

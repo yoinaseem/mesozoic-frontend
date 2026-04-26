@@ -2,15 +2,6 @@
 
 import { useBookingCart } from "@/context/booking-cart-context";
 
-function formatDateDdMmYyyy(date: string): string {
-  const dateOnly = date.split("T")[0];
-  const parts = dateOnly.split("-");
-  if (parts.length === 3) {
-    return `${parts[2]}-${parts[1]}-${parts[0]}`;
-  }
-  return date;
-}
-
 function Line({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-3 text-sm">
@@ -51,20 +42,15 @@ export function BookingSummary() {
       </section>
 
       {cart.ferry ? (
+        // TODO(DESD-100): the ferry summary needs the customer-picked
+        // travel_date once the customer FerryStep is re-implemented around the
+        // (slot, date) booking shape. Slots no longer carry per-trip dates.
         <section className="space-y-2">
           <h4 className="text-base-color text-sm font-semibold">Ferry</h4>
           <Line label="Ferry" value={cart.ferry.ferry.name} />
           <Line
-            label="Departure Date"
-            value={formatDateDdMmYyyy(cart.ferry.schedule.travel_date)}
-          />
-          <Line
             label="Departure Time"
             value={cart.ferry.schedule.departure_time}
-          />
-          <Line
-            label="Arrival Date"
-            value={formatDateDdMmYyyy(cart.ferry.schedule.arrival_date)}
           />
           <Line
             label="Arrival Time"
