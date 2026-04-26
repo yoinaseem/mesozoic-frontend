@@ -14,9 +14,15 @@ function todayIso(): string {
 // Ticket modules use Reservation::seatPoolOn, which is exclusive on
 // check-out — guests are leaving that day. Subtract one day to get the
 // last bookable visit date.
+//
+// Parse + emit in UTC to avoid the local-timezone round-trip that
+// `new Date("YYYY-MM-DD")` triggers: in a positive-offset timezone (e.g.
+// Asia/Dubai), local-midnight serialises as the previous day in UTC, so
+// `toISOString().slice(0, 10)` would lop an extra day off.
 function previousDayIso(date: string): string {
-  const d = new Date(`${date}T00:00:00`);
-  d.setDate(d.getDate() - 1);
+  const [year, month, day] = date.split("-").map(Number);
+  const d = new Date(Date.UTC(year, month - 1, day));
+  d.setUTCDate(d.getUTCDate() - 1);
   return d.toISOString().slice(0, 10);
 }
 
