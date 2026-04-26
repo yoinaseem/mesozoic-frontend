@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -91,9 +90,6 @@ export default function Navbar() {
   const toggleClass = transparentOnHero
     ? "text-white! drop-shadow-md hover:bg-white/10"
     : "text-primary hover:bg-base/70";
-  const logoIconSrc = transparentOnHero
-    ? "/img/nav-logo-dark.png"
-    : "/img/nav-logo-light.png";
   const brandTextClass = transparentOnHero
     ? "text-white! drop-shadow-md"
     : "text-primary";
@@ -117,16 +113,6 @@ export default function Navbar() {
             }
             aria-label="Mesozoic Isle home"
           >
-            <Image
-              src={logoIconSrc}
-              alt=""
-              width={128}
-              height={128}
-              priority
-              className={`h-11 w-11 object-contain lg:h-12 lg:w-12 ${
-                transparentOnHero ? "mix-blend-screen" : ""
-              }`}
-            />
             <span className={`inline-flex flex-col leading-none ${brandTextClass}`}>
               <span className="font-heading text-[1.45rem] tracking-[0.32em] font-semibold lg:text-[1.6rem]">
                 MESOZOIC
@@ -153,7 +139,7 @@ export default function Navbar() {
           </nav>
 
           <div className="flex items-center gap-2 lg:gap-4">
-            <ModeToggle className={toggleClass} />
+            <ModeToggle className={`-translate-y-0.5 ${toggleClass}`} />
 
             {loading ? (
               <div aria-hidden className="size-8" />
