@@ -6,8 +6,7 @@ import {
   TreePalm,
   Users,
   Receipt,
-  Shield,
-  KeyRound,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 
@@ -80,18 +79,15 @@ export const adminNavItems: AdminNavItem[] = [
   // the permission has been seeded yet. Switch to permission-based once the
   // backend confirms `roles.manage` lands on every superadmin's token.
   {
-    title: "Roles",
+    title: "Settings",
     url: "/admin/roles",
-    icon: Shield,
+    icon: Settings,
     permission: null,
     role: "superadmin",
-  },
-  {
-    title: "Permissions",
-    url: "/admin/permissions",
-    icon: KeyRound,
-    permission: null,
-    role: "superadmin",
+    items: [
+      { title: "Roles", url: "/admin/roles" },
+      { title: "Permissions", url: "/admin/permissions" },
+    ],
   },
   {
     title: "Users",
