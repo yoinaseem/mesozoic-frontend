@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -72,10 +73,10 @@ export type SubmitStepError = {
 export type SubmitResult = {
   reservationId: number | null;
   rooms: RoomBooking[];
-  parkBooking: ParkBooking | null;
-  parkActivityBooking: ParkActivityBooking | null;
-  beachBooking: BeachBooking | null;
-  ferryBooking: FerryBooking | null;
+  parkBookings: ParkBooking[];
+  parkActivityBookings: ParkActivityBooking[];
+  beachBookings: BeachBooking[];
+  ferryBookings: FerryBooking[];
   errors: SubmitStepError[];
 };
 
@@ -143,10 +144,23 @@ type BookingCartContextValue = {
   // Convenience getters derived from cart.rooms.
   primaryRoom: RoomSelection | null;
   tripWindow: TripWindow | null;
-  setFerry: (selection: FerrySelection | null) => void;
-  setParkTicket: (selection: ParkTicketSelection | null) => void;
-  setParkActivity: (selection: ParkActivitySelection | null) => void;
-  setBeachActivity: (selection: BeachActivitySelection | null) => void;
+  // Ferries — multi.
+  addFerry: (selection: FerrySelection) => void;
+  removeFerry: (index: number) => void;
+  clearFerries: () => void;
+  // Park tickets — multi. Removing a ticket cascades to drop any park
+  // activities tied to its (park_id, visit_date) combo.
+  addParkTicket: (selection: ParkTicketSelection) => void;
+  removeParkTicket: (index: number) => void;
+  clearParkTickets: () => void;
+  // Park activities — multi.
+  addParkActivity: (selection: ParkActivitySelection) => void;
+  removeParkActivity: (index: number) => void;
+  clearParkActivities: () => void;
+  // Beach activities — multi.
+  addBeachActivity: (selection: BeachActivitySelection) => void;
+  removeBeachActivity: (index: number) => void;
+  clearBeachActivities: () => void;
   isStepUnlocked: (step: BookingStep) => boolean;
   stepLockReason: (step: BookingStep) => string | null;
   hasAnyAddOn: boolean;
@@ -177,15 +191,25 @@ type BookingCartContextValue = {
   goToPreviousStep: () => void;
   hasPreviousStep: boolean;
   hasNextStep: boolean;
+  // Step commit registry — each step that has a draftable form registers
+  // a tryCommit() callback at mount; tab-click navigation runs the active
+  // step's committer first so partial input doesn't get silently dropped
+  // when the customer switches tabs without pressing Next. The committer
+  // returns false to block navigation (touched-but-invalid form).
+  registerStepCommitter: (
+    step: BookingStep,
+    fn: (() => boolean) | null,
+  ) => void;
+  tryCommitActiveStep: () => boolean;
   reset: () => void;
 };
 
 const EMPTY_CART: BookingCart = {
   rooms: [],
-  ferry: null,
-  parkTicket: null,
-  parkActivity: null,
-  beachActivity: null,
+  ferries: [],
+  parkTickets: [],
+  parkActivities: [],
+  beachActivities: [],
 };
 
 const BookingCartContext = createContext<BookingCartContextValue | null>(null);
@@ -246,6 +270,26 @@ export function BookingCartProvider({
   const [existingBookingsRefreshKey, setExistingBookingsRefreshKey] =
     useState(0);
   const [activeStep, setActiveStep] = useState<BookingStep>("room");
+
+  // Step commit registry. Steps push their tryCommit() callback through
+  // a stable wrapper that delegates to a ref — this lets the callback
+  // close over fresh form state without us having to re-register on
+  // every render. Each step writes to its own slot; the active step's
+  // entry is consulted on tab navigation.
+  const stepCommittersRef = useRef<
+    Partial<Record<BookingStep, () => boolean>>
+  >({});
+
+  const registerStepCommitter = useCallback(
+    (step: BookingStep, fn: (() => boolean) | null) => {
+      if (fn === null) {
+        delete stepCommittersRef.current[step];
+      } else {
+        stepCommittersRef.current[step] = fn;
+      }
+    },
+    [],
+  );
 
   // Hydrate from storage when the user resolves. Re-runs when the user
   // changes (logout/login as a different account).
@@ -366,33 +410,125 @@ export function BookingCartProvider({
     setRoomAlreadyExists(false);
   }, []);
 
-  const setFerry = useCallback((selection: FerrySelection | null) => {
-    setCart((prev) => ({ ...prev, ferry: selection }));
+  const addFerry = useCallback((selection: FerrySelection) => {
+    setCart((prev) => ({ ...prev, ferries: [...prev.ferries, selection] }));
   }, []);
 
-  // A park activity only makes sense when a park ticket is held, so dropping
-  // the ticket also drops the activity.
-  const setParkTicket = useCallback((selection: ParkTicketSelection | null) => {
-    setCart((prev) =>
-      selection === null
-        ? { ...prev, parkTicket: null, parkActivity: null }
-        : { ...prev, parkTicket: selection },
-    );
+  const removeFerry = useCallback((index: number) => {
+    setCart((prev) => ({
+      ...prev,
+      ferries: prev.ferries.filter((_, i) => i !== index),
+    }));
   }, []);
 
-  const setParkActivity = useCallback(
-    (selection: ParkActivitySelection | null) => {
-      setCart((prev) => ({ ...prev, parkActivity: selection }));
+  const clearFerries = useCallback(() => {
+    setCart((prev) => ({ ...prev, ferries: [] }));
+  }, []);
+
+  const addParkTicket = useCallback((selection: ParkTicketSelection) => {
+    setCart((prev) => ({
+      ...prev,
+      parkTickets: [...prev.parkTickets, selection],
+    }));
+  }, []);
+
+  // Removing a park ticket cascades to any park activities tied to its
+  // (park_id, date) combo: those activities require a same-day day-pass
+  // (cart-side or already-on-trip) and would 422 on submit otherwise.
+  // Activities still backed by an existingBookings day-pass are kept —
+  // those are independent of cart state.
+  const removeParkTicket = useCallback(
+    (index: number) => {
+      setCart((prev) => {
+        const removed = prev.parkTickets[index];
+        if (!removed) return prev;
+        const remainingTickets = prev.parkTickets.filter(
+          (_, i) => i !== index,
+        );
+        const stillCoveredByCart = (parkId: number, date: string) =>
+          remainingTickets.some(
+            (t) => t.park.id === parkId && t.visitDate === date,
+          );
+        const stillCoveredByExisting = (parkId: number, date: string) =>
+          existingBookings.parkDates.has(`${parkId}|${date}`);
+        const remainingActivities = prev.parkActivities.filter((a) => {
+          const date = a.schedule?.date ?? a.date ?? null;
+          if (date === null) return true;
+          const parkId = a.activity.park_id;
+          if (parkId !== removed.park.id || date !== removed.visitDate) {
+            return true;
+          }
+          return (
+            stillCoveredByCart(parkId, date) ||
+            stillCoveredByExisting(parkId, date)
+          );
+        });
+        return {
+          ...prev,
+          parkTickets: remainingTickets,
+          parkActivities: remainingActivities,
+        };
+      });
+    },
+    [existingBookings.parkDates],
+  );
+
+  const clearParkTickets = useCallback(() => {
+    setCart((prev) => {
+      // Same cascade as removeParkTicket but for every ticket at once.
+      const stillCoveredByExisting = (parkId: number, date: string) =>
+        existingBookings.parkDates.has(`${parkId}|${date}`);
+      const remainingActivities = prev.parkActivities.filter((a) => {
+        const date = a.schedule?.date ?? a.date ?? null;
+        if (date === null) return true;
+        return stillCoveredByExisting(a.activity.park_id, date);
+      });
+      return {
+        ...prev,
+        parkTickets: [],
+        parkActivities: remainingActivities,
+      };
+    });
+  }, [existingBookings.parkDates]);
+
+  const addParkActivity = useCallback((selection: ParkActivitySelection) => {
+    setCart((prev) => ({
+      ...prev,
+      parkActivities: [...prev.parkActivities, selection],
+    }));
+  }, []);
+
+  const removeParkActivity = useCallback((index: number) => {
+    setCart((prev) => ({
+      ...prev,
+      parkActivities: prev.parkActivities.filter((_, i) => i !== index),
+    }));
+  }, []);
+
+  const clearParkActivities = useCallback(() => {
+    setCart((prev) => ({ ...prev, parkActivities: [] }));
+  }, []);
+
+  const addBeachActivity = useCallback(
+    (selection: BeachActivitySelection) => {
+      setCart((prev) => ({
+        ...prev,
+        beachActivities: [...prev.beachActivities, selection],
+      }));
     },
     [],
   );
 
-  const setBeachActivity = useCallback(
-    (selection: BeachActivitySelection | null) => {
-      setCart((prev) => ({ ...prev, beachActivity: selection }));
-    },
-    [],
-  );
+  const removeBeachActivity = useCallback((index: number) => {
+    setCart((prev) => ({
+      ...prev,
+      beachActivities: prev.beachActivities.filter((_, i) => i !== index),
+    }));
+  }, []);
+
+  const clearBeachActivities = useCallback(() => {
+    setCart((prev) => ({ ...prev, beachActivities: [] }));
+  }, []);
 
   const reset = useCallback(() => {
     setCart(EMPTY_CART);
@@ -427,13 +563,62 @@ export function BookingCartProvider({
         });
       }
 
-      // Successful ticket slots clear so a retry doesn't re-POST them.
-      // The just-posted rows show up in existingBookings after the
-      // refresh below, so the customer still sees them in the summary.
-      if (result.parkBooking) next.parkTicket = null;
-      if (result.beachBooking) next.beachActivity = null;
-      if (result.ferryBooking) next.ferry = null;
-      if (result.parkActivityBooking) next.parkActivity = null;
+      // Drop staged tickets/activities that successfully posted so a retry
+      // doesn't re-POST them. The just-posted rows show up in
+      // existingBookings after the refresh below, so the customer still
+      // sees them in the summary. Match each cart entry against the
+      // result list by (park_id, date) for tickets and (schedule_id) /
+      // (activity_id, date) for activities — same identity tuples the
+      // submit code uses, so a partial success leaves only the items that
+      // didn't land yet.
+      if (result.parkBookings.length > 0) {
+        next.parkTickets = prev.parkTickets.filter((t) => {
+          return !result.parkBookings.some(
+            (pb) =>
+              pb.park_id === t.park.id &&
+              pb.date === t.visitDate &&
+              pb.status === "confirmed",
+          );
+        });
+      }
+      if (result.parkActivityBookings.length > 0) {
+        next.parkActivities = prev.parkActivities.filter((a) => {
+          return !result.parkActivityBookings.some((pab) => {
+            if (pab.status !== "confirmed") return false;
+            if (a.schedule) {
+              return pab.park_activity_schedule_id === a.schedule.id;
+            }
+            // All-day flow: server materialises a schedule on POST, match
+            // by date + activity from the embedded schedule.
+            const date = pab.schedule?.date;
+            const activityId = pab.schedule?.activity?.id;
+            return (
+              date === a.date &&
+              activityId !== undefined &&
+              activityId === a.activity.id
+            );
+          });
+        });
+      }
+      if (result.beachBookings.length > 0) {
+        next.beachActivities = prev.beachActivities.filter((b) => {
+          return !result.beachBookings.some(
+            (bb) =>
+              bb.beach_activity_schedule_id === b.schedule.id &&
+              bb.status === "confirmed",
+          );
+        });
+      }
+      if (result.ferryBookings.length > 0) {
+        next.ferries = prev.ferries.filter((f) => {
+          return !result.ferryBookings.some(
+            (fb) =>
+              fb.ferry_schedule_id === f.schedule.id &&
+              fb.travel_date === f.travelDate &&
+              fb.status === "confirmed",
+          );
+        });
+      }
 
       return next;
     });
@@ -470,10 +655,10 @@ export function BookingCartProvider({
             existingId: anchor.id,
           },
         ],
-        ferry: null,
-        parkTicket: null,
-        parkActivity: null,
-        beachActivity: null,
+        ferries: [],
+        parkTickets: [],
+        parkActivities: [],
+        beachActivities: [],
       });
       setReservationId(reservation.id);
       setAttachToReservationId(reservation.id);
@@ -498,10 +683,13 @@ export function BookingCartProvider({
         case "beach-activity":
           return hasRoom;
         case "park-activity":
-          return hasRoom && (cart.parkTicket !== null || hasExistingDayPass);
+          return (
+            hasRoom &&
+            (cart.parkTickets.length > 0 || hasExistingDayPass)
+          );
       }
     },
-    [hasRoom, cart.parkTicket, hasExistingDayPass],
+    [hasRoom, cart.parkTickets.length, hasExistingDayPass],
   );
 
   const stepLockReason = useCallback(
@@ -516,10 +704,10 @@ export function BookingCartProvider({
   );
 
   const hasAnyAddOn =
-    cart.ferry !== null ||
-    cart.parkTicket !== null ||
-    cart.parkActivity !== null ||
-    cart.beachActivity !== null;
+    cart.ferries.length > 0 ||
+    cart.parkTickets.length > 0 ||
+    cart.parkActivities.length > 0 ||
+    cart.beachActivities.length > 0;
 
   const hasStagedItems = hasStagedItemsHelper({
     cart,
@@ -574,14 +762,20 @@ export function BookingCartProvider({
     return false;
   }, [activeStep, isStepUnlocked]);
 
+  const tryCommitActiveStep = useCallback((): boolean => {
+    const fn = stepCommittersRef.current[activeStep];
+    if (!fn) return true;
+    return fn();
+  }, [activeStep]);
+
   const submitCart = useCallback(async (): Promise<SubmitResult> => {
     const result: SubmitResult = {
       reservationId: null,
       rooms: [],
-      parkBooking: null,
-      parkActivityBooking: null,
-      beachBooking: null,
-      ferryBooking: null,
+      parkBookings: [],
+      parkActivityBookings: [],
+      beachBookings: [],
+      ferryBookings: [],
       errors: [],
     };
 
@@ -642,21 +836,23 @@ export function BookingCartProvider({
       }
       result.reservationId = rid;
 
-      // Independent tickets in parallel. parkTicket runs alongside the
-      // others because parkActivity sequentially waits for it below.
+      // Independent items in parallel. Park tickets all fan out here so
+      // their day-passes are in place before we kick off park activities
+      // sequentially below — one activity per (park, date) needs the
+      // matching ticket landed first.
+      const reservationId = rid;
       const independent: Array<Promise<void>> = [];
 
-      if (cart.parkTicket) {
-        const ticketSelection = cart.parkTicket;
+      for (const ticketSelection of cart.parkTickets) {
         independent.push(
           createParkBooking({
-            reservation_id: rid,
+            reservation_id: reservationId,
             park_id: ticketSelection.park.id,
             date: ticketSelection.visitDate,
             guests: ticketSelection.guests,
           })
             .then((res) => {
-              result.parkBooking = res.data;
+              result.parkBookings.push(res.data);
             })
             .catch((error) => {
               result.errors.push(toStepError("park-ticket", error));
@@ -664,16 +860,15 @@ export function BookingCartProvider({
         );
       }
 
-      if (cart.beachActivity) {
-        const beachSelection = cart.beachActivity;
+      for (const beachSelection of cart.beachActivities) {
         independent.push(
           createBeachBooking({
-            reservation_id: rid,
+            reservation_id: reservationId,
             beach_activity_schedule_id: beachSelection.schedule.id,
             guests: beachSelection.guests,
           })
             .then((res) => {
-              result.beachBooking = res.data;
+              result.beachBookings.push(res.data);
             })
             .catch((error) => {
               result.errors.push(toStepError("beach-activity", error));
@@ -681,17 +876,16 @@ export function BookingCartProvider({
         );
       }
 
-      if (cart.ferry) {
-        const ferrySelection = cart.ferry;
+      for (const ferrySelection of cart.ferries) {
         independent.push(
           createFerryBooking({
-            reservation_id: rid,
+            reservation_id: reservationId,
             ferry_schedule_id: ferrySelection.schedule.id,
             travel_date: ferrySelection.travelDate,
             guests: ferrySelection.passengers,
           })
             .then((res) => {
-              result.ferryBooking = res.data;
+              result.ferryBookings.push(res.data);
             })
             .catch((error) => {
               result.errors.push(toStepError("ferry", error));
@@ -701,57 +895,87 @@ export function BookingCartProvider({
 
       await Promise.all(independent);
 
-      if (cart.parkActivity) {
-        const parkActivitySelection = cart.parkActivity;
-        const dayPassLanded =
-          result.parkBooking !== null && result.parkBooking.status === "confirmed";
+      // Park activities depend on a same-(park, date) day-pass. We accept
+      // either a freshly-confirmed park booking from this submit OR an
+      // existing confirmed one from the reservation. If a cart ticket was
+      // attempted for that pair and failed, skip the activity with a
+      // clear error rather than letting the API 422.
+      const newPassDates = new Set(
+        result.parkBookings
+          .filter((pb) => pb.status === "confirmed")
+          .map((pb) => `${pb.park_id}|${pb.date}`),
+      );
+      const existingPassDates = existingBookings.parkDates;
 
-        if (!dayPassLanded && cart.parkTicket) {
-          result.errors.push({
-            step: "park-activity",
-            message:
-              "Park activity skipped — the day-pass booking failed, so the activity has no prerequisite.",
-            fieldErrors: {},
-          });
-        } else {
+      const activityPromises = cart.parkActivities.map(
+        async (parkActivitySelection) => {
+          const activityDate =
+            parkActivitySelection.schedule?.date ??
+            parkActivitySelection.date ??
+            null;
+          const activityParkId = parkActivitySelection.activity.park_id;
+
+          if (activityDate === null) {
+            result.errors.push({
+              step: "park-activity",
+              message: `Park activity "${parkActivitySelection.activity.name}" is missing a date — pick a schedule or set a date.`,
+              fieldErrors: {},
+            });
+            return;
+          }
+
+          const passKey = `${activityParkId}|${activityDate}`;
+          const hasPass =
+            newPassDates.has(passKey) || existingPassDates.has(passKey);
+
+          if (!hasPass) {
+            // The cart had a ticket for this (park, date) but it didn't
+            // land — skip with the failure-cascade message. If there
+            // never was a matching ticket, surface the missing-day-pass
+            // error so the customer can fix the cart.
+            const ticketWasAttempted = cart.parkTickets.some(
+              (t) =>
+                t.park.id === activityParkId && t.visitDate === activityDate,
+            );
+            result.errors.push({
+              step: "park-activity",
+              message: ticketWasAttempted
+                ? `"${parkActivitySelection.activity.name}" skipped — the day-pass for ${activityDate} didn't book successfully.`
+                : `"${parkActivitySelection.activity.name}" needs a day-pass for ${activityDate}.`,
+              fieldErrors: {},
+            });
+            return;
+          }
+
           const payload = parkActivitySelection.schedule
             ? {
-                reservation_id: rid,
+                reservation_id: reservationId,
                 park_activity_schedule_id: parkActivitySelection.schedule.id,
                 guests: parkActivitySelection.guests,
               }
-            : parkActivitySelection.date
-              ? {
-                  reservation_id: rid,
-                  park_activity_id: parkActivitySelection.activity.id,
-                  date: parkActivitySelection.date,
-                  guests: parkActivitySelection.guests,
-                }
-              : null;
+            : {
+                reservation_id: reservationId,
+                park_activity_id: parkActivitySelection.activity.id,
+                date: activityDate,
+                guests: parkActivitySelection.guests,
+              };
 
-          if (payload === null) {
-            result.errors.push({
-              step: "park-activity",
-              message:
-                "Park activity selection is incomplete — pick a schedule or date.",
-              fieldErrors: {},
-            });
-          } else {
-            try {
-              const res = await createParkActivityBooking(payload);
-              result.parkActivityBooking = res.data;
-            } catch (error) {
-              result.errors.push(toStepError("park-activity", error));
-            }
+          try {
+            const res = await createParkActivityBooking(payload);
+            result.parkActivityBookings.push(res.data);
+          } catch (error) {
+            result.errors.push(toStepError("park-activity", error));
           }
-        }
-      }
+        },
+      );
+
+      await Promise.all(activityPromises);
 
       return result;
     } finally {
       setSubmitting(false);
     }
-  }, [cart, attachToReservationId]);
+  }, [cart, attachToReservationId, existingBookings.parkDates]);
 
   const value = useMemo<BookingCartContextValue>(
     () => ({
@@ -766,10 +990,18 @@ export function BookingCartProvider({
       clearRooms,
       primaryRoom,
       tripWindow,
-      setFerry,
-      setParkTicket,
-      setParkActivity,
-      setBeachActivity,
+      addFerry,
+      removeFerry,
+      clearFerries,
+      addParkTicket,
+      removeParkTicket,
+      clearParkTickets,
+      addParkActivity,
+      removeParkActivity,
+      clearParkActivities,
+      addBeachActivity,
+      removeBeachActivity,
+      clearBeachActivities,
       isStepUnlocked,
       stepLockReason,
       hasAnyAddOn,
@@ -786,6 +1018,8 @@ export function BookingCartProvider({
       goToPreviousStep,
       hasPreviousStep,
       hasNextStep,
+      registerStepCommitter,
+      tryCommitActiveStep,
       reset,
     }),
     [
@@ -799,10 +1033,18 @@ export function BookingCartProvider({
       clearRooms,
       primaryRoom,
       tripWindow,
-      setFerry,
-      setParkTicket,
-      setParkActivity,
-      setBeachActivity,
+      addFerry,
+      removeFerry,
+      clearFerries,
+      addParkTicket,
+      removeParkTicket,
+      clearParkTickets,
+      addParkActivity,
+      removeParkActivity,
+      clearParkActivities,
+      addBeachActivity,
+      removeBeachActivity,
+      clearBeachActivities,
       isStepUnlocked,
       stepLockReason,
       hasAnyAddOn,
@@ -818,6 +1060,8 @@ export function BookingCartProvider({
       goToPreviousStep,
       hasPreviousStep,
       hasNextStep,
+      registerStepCommitter,
+      tryCommitActiveStep,
       reset,
     ],
   );

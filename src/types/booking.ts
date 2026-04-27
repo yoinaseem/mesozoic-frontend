@@ -413,10 +413,14 @@ export type BookingStep =
 // anchors the trip (creates the reservation if no `attachToReservationId`),
 // subsequent rooms POST against that reservation_id. Empty array = no
 // rooms picked yet → ticket steps stay locked.
+//
+// Every add-on is an array so the customer can stage several of each per
+// reservation — multiple park days, multiple beach sessions, multiple
+// ferry crossings (round-trips, day excursions, etc.).
 export type BookingCart = {
   rooms: RoomSelection[];
-  ferry: FerrySelection | null;
-  parkTicket: ParkTicketSelection | null;
-  parkActivity: ParkActivitySelection | null;
-  beachActivity: BeachActivitySelection | null;
+  ferries: FerrySelection[];
+  parkTickets: ParkTicketSelection[];
+  parkActivities: ParkActivitySelection[];
+  beachActivities: BeachActivitySelection[];
 };

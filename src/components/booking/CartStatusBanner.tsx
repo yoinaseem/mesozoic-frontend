@@ -15,10 +15,10 @@ export function CartStatusBanner() {
 
   const stagedCount =
     cart.rooms.filter((r) => r.existingId === undefined).length +
-    (cart.ferry ? 1 : 0) +
-    (cart.parkTicket ? 1 : 0) +
-    (cart.parkActivity ? 1 : 0) +
-    (cart.beachActivity ? 1 : 0);
+    cart.ferries.length +
+    cart.parkTickets.length +
+    cart.parkActivities.length +
+    cart.beachActivities.length;
 
   return (
     <div className="border-primary/30 bg-primary/5 mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">

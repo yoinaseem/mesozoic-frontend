@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { StepNav } from "@/components/booking/StepNav";
@@ -14,31 +15,39 @@ import type { Ferry, FerrySchedule } from "@/types/booking";
 export function FerryStep() {
   const {
     cart,
-    setFerry,
+    addFerry,
+    removeFerry,
+    clearFerries,
     existingBookings,
     primaryRoom,
     tripWindow,
     hasNextStep,
+    registerStepCommitter,
   } = useBookingCart();
 
   const [ferries, setFerries] = useState<Ferry[]>([]);
   const [loadingFerries, setLoadingFerries] = useState(true);
-  const [selectedFerryId, setSelectedFerryId] = useState<number | null>(
-    cart.ferry?.ferry.id ?? null,
-  );
+  const [selectedFerryId, setSelectedFerryId] = useState<number | null>(null);
 
   const [schedules, setSchedules] = useState<FerrySchedule[]>([]);
-  const [loadingSchedules, setLoadingSchedules] = useState(false);
+  // Loading is derived from a "loadedFor" tracker — when the user picks a
+  // new ferry the tracker still holds the previous id, so we render
+  // "Loading…" until the new fetch lands and updates it.
+  const [schedulesLoadedFor, setSchedulesLoadedFor] = useState<number | null>(
+    null,
+  );
+  const loadingSchedules =
+    selectedFerryId !== null && schedulesLoadedFor !== selectedFerryId;
   const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(
-    cart.ferry?.schedule.id ?? null,
+    null,
   );
 
   const [travelDate, setTravelDate] = useState<string>(
-    cart.ferry?.travelDate ?? tripWindow?.checkIn ?? "",
+    tripWindow?.checkIn ?? "",
   );
 
   const [passengers, setPassengers] = useState<number>(
-    cart.ferry?.passengers ?? primaryRoom?.guests ?? 1,
+    primaryRoom?.guests ?? 1,
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -62,16 +71,16 @@ export function FerryStep() {
   useEffect(() => {
     if (selectedFerryId === null) return;
     let cancelled = false;
-    setLoadingSchedules(true);
-    listFerrySchedules(selectedFerryId)
+    const ferryId = selectedFerryId;
+    listFerrySchedules(ferryId)
       .then((res) => {
         if (cancelled) return;
         setSchedules(res.data);
-        setLoadingSchedules(false);
+        setSchedulesLoadedFor(ferryId);
       })
       .catch(() => {
         if (cancelled) return;
-        setLoadingSchedules(false);
+        setSchedulesLoadedFor(ferryId);
       });
     return () => {
       cancelled = true;
@@ -97,6 +106,23 @@ export function FerryStep() {
     selectedFerryId !== null ||
     selectedScheduleId !== null ||
     travelDate !== (tripWindow?.checkIn ?? "");
+
+  // Schedule slots already taken by another staged ferry on the same
+  // travel date — server enforces uniqueness on (reservation, schedule,
+  // travel_date), so we mirror that client-side to prevent duplicate-add.
+  const stagedKeys = useMemo(() => {
+    return new Set(
+      cart.ferries.map((f) => `${f.schedule.id}|${f.travelDate}`),
+    );
+  }, [cart.ferries]);
+
+  const resetForm = () => {
+    setSelectedFerryId(null);
+    setSelectedScheduleId(null);
+    setTravelDate(tripWindow?.checkIn ?? "");
+    setPassengers(primaryRoom?.guests ?? 1);
+    setError(null);
+  };
 
   const commitSelection = (): boolean => {
     setError(null);
@@ -135,21 +161,24 @@ export function FerryStep() {
     }
     if (passengers > pool) {
       setError(
-        `Ferry passengers (${passengers}) exceed your room seat pool on ${travelDate} (${pool}). Adjust the booking or add another room.`,
+        `Ferry passengers (${passengers}) exceed your room seat pool on ${travelDate} (${pool}).`,
       );
       return false;
     }
-    if (
-      existingBookings.ferryScheduleDates.has(
-        `${selectedSchedule.id}|${travelDate}`,
-      )
-    ) {
+    const key = `${selectedSchedule.id}|${travelDate}`;
+    if (stagedKeys.has(key)) {
+      setError(
+        "You already have this crossing in your cart for this date.",
+      );
+      return false;
+    }
+    if (existingBookings.ferryScheduleDates.has(key)) {
       setError(
         "Your existing trip already has a ferry on this slot for this date.",
       );
       return false;
     }
-    setFerry({
+    addFerry({
       ferry: selectedFerry,
       schedule: selectedSchedule,
       travelDate,
@@ -161,14 +190,57 @@ export function FerryStep() {
     return true;
   };
 
-  // Optional step — Next without form interaction just advances when
-  // there's a later step. When this is the last reachable step the
-  // button reads "Add to cart" and must always commit (or surface a
-  // validation error) — see BeachActivityStep for the full reasoning.
-  const handleNext = (): boolean => {
-    if (hasNextStep && !formIsTouched && !cart.ferry) return true;
-    return commitSelection();
+  // Refs for scroll-on-change UX.
+  const formHeadingRef = useRef<HTMLHeadingElement>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (error) {
+      errorRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [error]);
+
+  const handleAddAnother = () => {
+    if (commitSelection()) {
+      resetForm();
+      formHeadingRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
   };
+
+  const handleNext = (): boolean => {
+    if (!formIsTouched) {
+      if (hasNextStep) return true;
+      if (cart.ferries.length > 0) return true;
+      return commitSelection();
+    }
+    if (!commitSelection()) return false;
+    resetForm();
+    return true;
+  };
+
+  // Tab-navigation commit shim — wrap the latest closure in a ref so the
+  // registered fn keeps seeing fresh form state. Ref assignment happens
+  // in an effect to satisfy the react-hooks/refs rule.
+  const tryCommitRef = useRef<() => boolean>(() => true);
+  useEffect(() => {
+    tryCommitRef.current = (): boolean => {
+      if (!formIsTouched) return true;
+      if (!commitSelection()) return false;
+      resetForm();
+      return true;
+    };
+  });
+
+  useEffect(() => {
+    registerStepCommitter("ferry", () => tryCommitRef.current());
+    return () => registerStepCommitter("ferry", null);
+  }, [registerStepCommitter]);
 
   return (
     <section className="card space-y-6">
@@ -176,10 +248,55 @@ export function FerryStep() {
         <h2 className="text-2xl font-semibold text-primary">Ferry booking</h2>
         <p className="text-muted text-sm">
           Pick a ferry, the departure slot, and the day you want to cross.
+          Add as many crossings as you like across your stay.
         </p>
       </header>
 
+      {cart.ferries.length > 0 ? (
+        <div className="space-y-2">
+          <h3 className="text-base-color text-sm font-semibold">
+            Ferries in your cart
+          </h3>
+          <ul className="border-base divide-base divide-y rounded-lg border">
+            {cart.ferries.map((f, index) => (
+              <li
+                key={`${f.schedule.id}-${f.travelDate}-${index}`}
+                className="flex items-start justify-between gap-4 px-4 py-3"
+              >
+                <div className="space-y-0.5 text-sm">
+                  <p className="text-primary font-semibold">{f.ferry.name}</p>
+                  <p className="text-muted">
+                    {f.travelDate} · {f.schedule.departure_time} →{" "}
+                    {f.schedule.arrival_time}
+                    {f.schedule.departure_port
+                      ? ` · ${f.schedule.departure_port} → ${f.schedule.arrival_port}`
+                      : ""}
+                    {" · "}
+                    {f.passengers} passenger{f.passengers === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeFerry(index)}
+                  className="text-muted hover:text-danger flex items-center gap-1 text-xs font-semibold"
+                  aria-label="Remove ferry"
+                >
+                  <Trash2 className="size-4" />
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       <div className="space-y-2">
+        <h3
+          ref={formHeadingRef}
+          className="text-base-color scroll-mt-24 text-sm font-semibold"
+        >
+          {cart.ferries.length === 0 ? "Pick a ferry" : "Add another crossing"}
+        </h3>
         <label className="block text-sm font-medium text-base-color">
           Ferry
         </label>
@@ -196,6 +313,12 @@ export function FerryStep() {
                   key={ferry.id}
                   type="button"
                   onClick={() => {
+                    // Toggle: clicking the active tile deselects.
+                    if (active) {
+                      setSelectedFerryId(null);
+                      setSelectedScheduleId(null);
+                      return;
+                    }
                     setSelectedFerryId(ferry.id);
                     setSelectedScheduleId(null);
                   }}
@@ -244,6 +367,12 @@ export function FerryStep() {
                 <tbody>
                   {schedules.map((s) => {
                     const active = selectedScheduleId === s.id;
+                    // Disable schedules already staged for the current
+                    // travelDate — duplicate (schedule_id, date) blocks
+                    // server-side, so prevent the add at the picker level.
+                    const stagedHere = stagedKeys.has(
+                      `${s.id}|${travelDate}`,
+                    );
                     return (
                       <tr
                         key={s.id}
@@ -259,15 +388,22 @@ export function FerryStep() {
                         <td className="px-3 py-2 text-right">
                           <button
                             type="button"
+                            disabled={stagedHere}
                             onClick={() => setSelectedScheduleId(s.id)}
                             className={
-                              active
+                              stagedHere
+                                ? "text-muted cursor-not-allowed text-sm font-semibold"
+                                : active
                                 ? "text-sm font-semibold text-primary"
                                 : "text-sm font-semibold text-primary hover:underline"
                             }
                             aria-pressed={active}
                           >
-                            {active ? "Selected" : "Select"}
+                            {stagedHere
+                              ? "In your cart"
+                              : active
+                              ? "Selected"
+                              : "Select"}
                           </button>
                         </td>
                       </tr>
@@ -323,18 +459,46 @@ export function FerryStep() {
         </div>
       </div>
 
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      {error ? (
+        <p
+          ref={errorRef}
+          className="scroll-mt-24 text-sm text-danger"
+          role="alert"
+        >
+          {error}
+        </p>
+      ) : null}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          className="btn-primary inline-flex items-center gap-2"
+          onClick={handleAddAnother}
+        >
+          <Plus className="size-4" aria-hidden />
+          {cart.ferries.length === 0 ? "Save crossing" : "Save & add another"}
+        </button>
+        {formIsTouched ? (
+          <button
+            type="button"
+            className="text-base-color hover:bg-base/40 rounded-lg border border-base px-4 py-2 text-sm font-semibold transition-colors"
+            onClick={resetForm}
+          >
+            Cancel
+          </button>
+        ) : null}
+      </div>
 
       <StepNav
         onNext={handleNext}
         leadingActions={
-          cart.ferry ? (
+          cart.ferries.length > 0 ? (
             <button
               type="button"
               className="text-sm font-semibold text-danger hover:opacity-80"
-              onClick={() => setFerry(null)}
+              onClick={clearFerries}
             >
-              Clear ferry booking
+              Clear all ferries
             </button>
           ) : null
         }

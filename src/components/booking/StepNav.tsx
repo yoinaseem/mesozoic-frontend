@@ -1,13 +1,20 @@
 "use client";
 
+import type { BookingStep } from "@/types/booking";
 import { useBookingCart } from "@/context/booking-cart-context";
 
+// onNext can return:
+//  - false: validation blocked navigation, stay on this step
+//  - true:  advance using the normal "next unlocked step" walk
+//  - BookingStep: jump directly to that step. Used when the step just
+//    committed something that unlocks a downstream step (e.g. adding
+//    a park ticket unlocks park-activity); the standard goToNextStep
+//    walk would still see the pre-commit cart and skip the now-valid
+//    target.
+type NextResult = boolean | BookingStep;
+
 type Props = {
-  // Called before advancing. Return false to block navigation (validation
-  // failed). Throwing or returning a Promise that resolves false also
-  // blocks. If the step has no commit semantics (e.g. nothing the user
-  // could have entered), pass undefined.
-  onNext?: () => boolean | Promise<boolean>;
+  onNext?: () => NextResult | Promise<NextResult>;
   // Called before going back. Default is "just navigate, don't commit".
   onPrevious?: () => boolean | Promise<boolean>;
   // Optional extra controls on the left side of the footer (e.g. a
@@ -21,14 +28,21 @@ export function StepNav({ onNext, onPrevious, leadingActions }: Props) {
     goToPreviousStep,
     hasPreviousStep,
     hasNextStep,
+    setActiveStep,
   } = useBookingCart();
 
   const handleNext = async () => {
-    if (onNext) {
-      const ok = await onNext();
-      if (!ok) return;
+    if (!onNext) {
+      goToNextStep();
+      return;
     }
-    goToNextStep();
+    const result = await onNext();
+    if (result === false) return;
+    if (result === true) {
+      goToNextStep();
+      return;
+    }
+    setActiveStep(result);
   };
 
   const handlePrevious = async () => {

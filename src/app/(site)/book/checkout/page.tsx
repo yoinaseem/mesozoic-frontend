@@ -54,6 +54,13 @@ function CheckoutInner() {
   const [validating, setValidating] = useState(true);
   const [submitResult, setSubmitResult] = useState<SubmitResult | null>(null);
 
+  // Refs for scroll-to-error UX. We scroll the error block into view
+  // whenever a fresh batch of error-severity issues lands or the submit
+  // returns errors — otherwise the customer might confirm without
+  // realising blockers were surfaced below the fold.
+  const prevalidateErrorRef = useRef<HTMLDivElement>(null);
+  const submitErrorRef = useRef<HTMLDivElement>(null);
+
   // Run prevalidation once the cart hydrates. Re-runs whenever the cart
   // shape changes (e.g. user edits then comes back).
   const lastValidatedRef = useRef<string | null>(null);
@@ -61,18 +68,19 @@ function CheckoutInner() {
     if (!hasStagedItems) return;
     const key = JSON.stringify({
       rooms: cart.rooms.map((r) => `${r.hotel.id}-${r.roomType.id}-${r.checkIn}-${r.checkOut}-${r.existingId ?? ""}`),
-      ferry: cart.ferry
-        ? `${cart.ferry.schedule.id}-${cart.ferry.travelDate}`
-        : null,
-      parkTicket: cart.parkTicket
-        ? `${cart.parkTicket.park.id}-${cart.parkTicket.visitDate}`
-        : null,
-      parkActivity: cart.parkActivity
-        ? `${cart.parkActivity.activity.id}-${cart.parkActivity.schedule?.id ?? cart.parkActivity.date ?? ""}`
-        : null,
-      beachActivity: cart.beachActivity
-        ? `${cart.beachActivity.schedule.id}`
-        : null,
+      ferries: cart.ferries.map(
+        (f) => `${f.schedule.id}-${f.travelDate}-${f.passengers}`,
+      ),
+      parkTickets: cart.parkTickets.map(
+        (t) => `${t.park.id}-${t.visitDate}-${t.guests}`,
+      ),
+      parkActivities: cart.parkActivities.map(
+        (a) =>
+          `${a.activity.id}-${a.schedule?.id ?? a.date ?? ""}-${a.guests}`,
+      ),
+      beachActivities: cart.beachActivities.map(
+        (b) => `${b.schedule.id}-${b.guests}`,
+      ),
     });
     if (lastValidatedRef.current === key) return;
     lastValidatedRef.current = key;
@@ -116,26 +124,49 @@ function CheckoutInner() {
         total += price * nights;
       }
     }
-    if (cart.parkTicket) {
-      const p = Number(cart.parkTicket.park.price);
-      if (Number.isFinite(p)) total += p * cart.parkTicket.guests;
+    for (const ticket of cart.parkTickets) {
+      const p = Number(ticket.park.price);
+      if (Number.isFinite(p)) total += p * ticket.guests;
     }
-    if (cart.beachActivity) {
-      total += cart.beachActivity.activity.price * cart.beachActivity.guests;
+    for (const ba of cart.beachActivities) {
+      total += ba.activity.price * ba.guests;
     }
-    if (cart.parkActivity) {
-      const p = Number(cart.parkActivity.activity.price);
-      if (Number.isFinite(p)) total += p * cart.parkActivity.guests;
+    for (const pa of cart.parkActivities) {
+      const p = Number(pa.activity.price);
+      if (Number.isFinite(p)) total += p * pa.guests;
     }
-    if (cart.ferry) {
-      const p = Number(cart.ferry.ferry.ferry_type?.price ?? 0);
-      if (Number.isFinite(p)) total += p * cart.ferry.passengers;
+    for (const f of cart.ferries) {
+      const p = Number(f.ferry.ferry_type?.price ?? 0);
+      if (Number.isFinite(p)) total += p * f.passengers;
     }
     return total;
   }, [cart]);
 
   const errorIssues = issues.filter((i) => i.severity === "error");
   const warningIssues = issues.filter((i) => i.severity === "warning");
+
+  // Scroll the prevalidate error block into view when a new batch of
+  // blockers shows up. Keyed on validating+count so we only scroll on a
+  // fresh validation result, not on every render.
+  useEffect(() => {
+    if (!validating && errorIssues.length > 0) {
+      prevalidateErrorRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  }, [validating, errorIssues.length]);
+
+  // Same for submit-time errors. submitResult identity changes when a
+  // new submit lands.
+  useEffect(() => {
+    if (submitResult && submitResult.errors.length > 0) {
+      submitErrorRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  }, [submitResult]);
 
   const editStep = (step: BookingStep) => {
     setActiveStep(step);
@@ -229,7 +260,11 @@ function CheckoutInner() {
         ) : null}
 
         {!validating && errorIssues.length > 0 ? (
-          <div className="border-danger/50 bg-danger/5 mb-4 rounded-xl border p-4 text-sm">
+          <div
+            ref={prevalidateErrorRef}
+            className="border-danger/50 bg-danger/5 scroll-mt-24 mb-4 rounded-xl border p-4 text-sm"
+            role="alert"
+          >
             <p className="text-danger font-semibold">
               {errorIssues.length} item{errorIssues.length === 1 ? "" : "s"}{" "}
               can&rsquo;t be booked as-is:
@@ -274,7 +309,11 @@ function CheckoutInner() {
         ) : null}
 
         {submitResult && submitResult.errors.length > 0 ? (
-          <div className="border-danger/50 bg-danger/5 mb-4 rounded-xl border p-4 text-sm">
+          <div
+            ref={submitErrorRef}
+            className="border-danger/50 bg-danger/5 scroll-mt-24 mb-4 rounded-xl border p-4 text-sm"
+            role="alert"
+          >
             <p className="text-danger font-semibold">
               {submitResult.reservationId !== null
                 ? "Some items couldn't be booked:"
@@ -318,75 +357,109 @@ function CheckoutInner() {
             </CheckoutSection>
           ) : null}
 
-          {cart.ferry ? (
+          {cart.ferries.length > 0 ? (
             <CheckoutSection
-              title="Ferry"
+              title={cart.ferries.length > 1 ? "Ferries" : "Ferry"}
               onEdit={() => editStep("ferry")}
             >
-              <p className="text-base-color text-sm font-semibold">
-                {cart.ferry.ferry.name}
-              </p>
-              <p className="text-muted text-xs">
-                {cart.ferry.travelDate} · {cart.ferry.schedule.departure_time} →{" "}
-                {cart.ferry.schedule.arrival_time}
-                {cart.ferry.schedule.departure_port
-                  ? ` · ${cart.ferry.schedule.departure_port} → ${cart.ferry.schedule.arrival_port}`
-                  : ""}
-              </p>
-              <p className="text-muted text-xs">
-                {cart.ferry.passengers} passenger
-                {cart.ferry.passengers === 1 ? "" : "s"}
-              </p>
+              <ul className="space-y-2">
+                {cart.ferries.map((f, i) => (
+                  <li key={`fc-${f.schedule.id}-${f.travelDate}-${i}`}>
+                    <p className="text-base-color text-sm font-semibold">
+                      {f.ferry.name}
+                    </p>
+                    <p className="text-muted text-xs">
+                      {f.travelDate} · {f.schedule.departure_time} →{" "}
+                      {f.schedule.arrival_time}
+                      {f.schedule.departure_port
+                        ? ` · ${f.schedule.departure_port} → ${f.schedule.arrival_port}`
+                        : ""}
+                    </p>
+                    <p className="text-muted text-xs">
+                      {f.passengers} passenger{f.passengers === 1 ? "" : "s"}
+                    </p>
+                  </li>
+                ))}
+              </ul>
             </CheckoutSection>
           ) : null}
 
-          {cart.parkTicket ? (
+          {cart.parkTickets.length > 0 ? (
             <CheckoutSection
-              title="Theme park ticket"
+              title={
+                cart.parkTickets.length > 1
+                  ? "Theme park tickets"
+                  : "Theme park ticket"
+              }
               onEdit={() => editStep("park-ticket")}
             >
-              <p className="text-base-color text-sm font-semibold">
-                {cart.parkTicket.park.name}
-              </p>
-              <p className="text-muted text-xs">
-                {cart.parkTicket.visitDate} · {cart.parkTicket.guests} guest
-                {cart.parkTicket.guests === 1 ? "" : "s"}
-              </p>
+              <ul className="space-y-2">
+                {cart.parkTickets.map((ticket, i) => (
+                  <li key={`pt-${ticket.park.id}-${ticket.visitDate}-${i}`}>
+                    <p className="text-base-color text-sm font-semibold">
+                      {ticket.park.name}
+                    </p>
+                    <p className="text-muted text-xs">
+                      {ticket.visitDate} · {ticket.guests} guest
+                      {ticket.guests === 1 ? "" : "s"}
+                    </p>
+                  </li>
+                ))}
+              </ul>
             </CheckoutSection>
           ) : null}
 
-          {cart.parkActivity ? (
+          {cart.parkActivities.length > 0 ? (
             <CheckoutSection
-              title="Park activity"
+              title={
+                cart.parkActivities.length > 1
+                  ? "Park activities"
+                  : "Park activity"
+              }
               onEdit={() => editStep("park-activity")}
             >
-              <p className="text-base-color text-sm font-semibold">
-                {cart.parkActivity.activity.name}
-              </p>
-              <p className="text-muted text-xs">
-                {cart.parkActivity.schedule
-                  ? `${cart.parkActivity.schedule.date} · ${cart.parkActivity.schedule.start_time}`
-                  : `${cart.parkActivity.date ?? "—"} · all day`}{" "}
-                · {cart.parkActivity.guests} guest
-                {cart.parkActivity.guests === 1 ? "" : "s"}
-              </p>
+              <ul className="space-y-2">
+                {cart.parkActivities.map((act, i) => (
+                  <li
+                    key={`pa-${act.activity.id}-${act.schedule?.id ?? act.date ?? ""}-${i}`}
+                  >
+                    <p className="text-base-color text-sm font-semibold">
+                      {act.activity.name}
+                    </p>
+                    <p className="text-muted text-xs">
+                      {act.schedule
+                        ? `${act.schedule.date} · ${act.schedule.start_time}`
+                        : `${act.date ?? "—"} · all day`}{" "}
+                      · {act.guests} guest{act.guests === 1 ? "" : "s"}
+                    </p>
+                  </li>
+                ))}
+              </ul>
             </CheckoutSection>
           ) : null}
 
-          {cart.beachActivity ? (
+          {cart.beachActivities.length > 0 ? (
             <CheckoutSection
-              title="Beach activity"
+              title={
+                cart.beachActivities.length > 1
+                  ? "Beach activities"
+                  : "Beach activity"
+              }
               onEdit={() => editStep("beach-activity")}
             >
-              <p className="text-base-color text-sm font-semibold">
-                {cart.beachActivity.activity.name}
-              </p>
-              <p className="text-muted text-xs">
-                {cart.beachActivity.schedule.activity_date} ·{" "}
-                {cart.beachActivity.schedule.start_time} ·{" "}
-                {cart.beachActivity.guests} guest
-                {cart.beachActivity.guests === 1 ? "" : "s"}
-              </p>
+              <ul className="space-y-2">
+                {cart.beachActivities.map((act, i) => (
+                  <li key={`ba-${act.schedule.id}-${i}`}>
+                    <p className="text-base-color text-sm font-semibold">
+                      {act.activity.name}
+                    </p>
+                    <p className="text-muted text-xs">
+                      {act.schedule.activity_date} · {act.schedule.start_time} ·{" "}
+                      {act.guests} guest{act.guests === 1 ? "" : "s"}
+                    </p>
+                  </li>
+                ))}
+              </ul>
             </CheckoutSection>
           ) : null}
         </div>

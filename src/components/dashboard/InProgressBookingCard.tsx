@@ -49,10 +49,10 @@ export function InProgressBookingCard() {
   const newRooms = cart.rooms.filter((r) => r.existingId === undefined);
   const stagedCount =
     newRooms.length +
-    (cart.ferry ? 1 : 0) +
-    (cart.parkTicket ? 1 : 0) +
-    (cart.parkActivity ? 1 : 0) +
-    (cart.beachActivity ? 1 : 0);
+    cart.ferries.length +
+    cart.parkTickets.length +
+    cart.parkActivities.length +
+    cart.beachActivities.length;
 
   // Pull a friendly title from whatever's in the cart. Prefer the
   // primary new room, fall back to the first ticket type with a name.
@@ -61,10 +61,23 @@ export function InProgressBookingCard() {
       const r = newRooms[0];
       return `${r.hotel.name} · ${r.roomType.name}`;
     }
-    if (cart.parkTicket) return `${cart.parkTicket.park.name} · day pass`;
-    if (cart.beachActivity) return cart.beachActivity.activity.name;
-    if (cart.parkActivity) return cart.parkActivity.activity.name;
-    if (cart.ferry) return `${cart.ferry.ferry.name} · ferry`;
+    if (cart.parkTickets.length > 0) {
+      const t = cart.parkTickets[0];
+      return `${t.park.name} · day pass${
+        cart.parkTickets.length > 1 ? ` (+${cart.parkTickets.length - 1})` : ""
+      }`;
+    }
+    if (cart.beachActivities.length > 0) {
+      return cart.beachActivities[0].activity.name;
+    }
+    if (cart.parkActivities.length > 0) {
+      return cart.parkActivities[0].activity.name;
+    }
+    if (cart.ferries.length > 0) {
+      return `${cart.ferries[0].ferry.name} · ferry${
+        cart.ferries.length > 1 ? ` (+${cart.ferries.length - 1})` : ""
+      }`;
+    }
     return "Trip in progress";
   })();
 

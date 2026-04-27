@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { StepNav } from "@/components/booking/StepNav";
@@ -13,37 +14,108 @@ import {
 import { seatPoolOn } from "@/lib/seat-pool";
 import type { ParkActivity, ParkActivitySchedule } from "@/types/booking";
 
+// Each row in the day-pass picker corresponds to one (park_id, date)
+// pair — coming from either the cart's parkTickets or the existing
+// reservation's confirmed parkBookings. Activities for *that* day-pass
+// are bookable (server enforces the day-pass-required rule per pair).
+type DayPassOption = {
+  // Stable id used by the picker — combines park_id + date.
+  key: string;
+  parkId: number;
+  parkName: string;
+  date: string;
+  // Cap on activity guests, derived from the matching ticket. Activities
+  // can't exceed the day-pass guest count (§14).
+  guestCap: number;
+  source: "cart" | "existing";
+};
+
 export function ParkActivityStep() {
   const {
     cart,
-    setParkActivity,
+    addParkActivity,
+    removeParkActivity,
+    clearParkActivities,
     existingBookings,
     tripWindow,
     hasNextStep,
+    registerStepCommitter,
   } = useBookingCart();
-  const cartParkTicket = cart.parkTicket;
-  // When the user is anchored on an existing reservation that already has
-  // a confirmed day-pass, derive the park + visit-date context from it so
-  // activities for that day-pass can still be booked. Cart ticket wins
-  // when both exist (the just-added ticket is what they're working on).
-  const fallbackExistingPass = existingBookings.parkBookings[0] ?? null;
-  const effectiveParkId =
-    cartParkTicket?.park.id ?? fallbackExistingPass?.park_id ?? null;
-  const effectiveDate =
-    cartParkTicket?.visitDate ?? fallbackExistingPass?.date ?? null;
-  const effectiveParkName =
-    cartParkTicket?.park.name ??
-    fallbackExistingPass?.park?.name ??
-    (effectiveParkId !== null ? `Park #${effectiveParkId}` : null);
-  const effectiveTicketGuests =
-    cartParkTicket?.guests ?? fallbackExistingPass?.guests ?? null;
+
+  // Build the day-pass option list each render — small (handful of
+  // tickets max) and cheap. Cart tickets win over existing duplicates
+  // because the cart values are the ones we'd expect a fresh-add to
+  // match against; if both exist for the same (park, date), they're
+  // really one pass — the cart entry shadows.
+  const dayPassOptions = useMemo<DayPassOption[]>(() => {
+    const seen = new Set<string>();
+    const out: DayPassOption[] = [];
+    for (const ticket of cart.parkTickets) {
+      const key = `${ticket.park.id}|${ticket.visitDate}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        key,
+        parkId: ticket.park.id,
+        parkName: ticket.park.name,
+        date: ticket.visitDate,
+        guestCap: ticket.guests,
+        source: "cart",
+      });
+    }
+    for (const pb of existingBookings.parkBookings) {
+      const key = `${pb.park_id}|${pb.date}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        key,
+        parkId: pb.park_id,
+        parkName: pb.park?.name ?? `Park #${pb.park_id}`,
+        date: pb.date,
+        guestCap: pb.guests,
+        source: "existing",
+      });
+    }
+    return out;
+  }, [cart.parkTickets, existingBookings.parkBookings]);
+
+  // Active day-pass — defaults to first option, but can be switched if
+  // the customer holds tickets for multiple parks/dates.
+  const [selectedPassKey, setSelectedPassKey] = useState<string | null>(
+    dayPassOptions[0]?.key ?? null,
+  );
+
+  // Reset the day-pass selection when the option list changes shape:
+  // a brand-new ticket should auto-select if nothing is held; a removed
+  // ticket whose key was selected falls back to the first remaining.
+  // Implemented as render-time setState (the React-recommended
+  // alternative to useEffect for "adjust state when prop changes")
+  // because setState-in-effect would trigger cascading renders.
+  const [prevDayPassOptions, setPrevDayPassOptions] =
+    useState(dayPassOptions);
+  if (dayPassOptions !== prevDayPassOptions) {
+    setPrevDayPassOptions(dayPassOptions);
+    if (dayPassOptions.length === 0) {
+      if (selectedPassKey !== null) setSelectedPassKey(null);
+    } else if (!dayPassOptions.some((opt) => opt.key === selectedPassKey)) {
+      setSelectedPassKey(dayPassOptions[0].key);
+    }
+  }
+
+  const selectedPass = useMemo(() => {
+    return dayPassOptions.find((opt) => opt.key === selectedPassKey) ?? null;
+  }, [dayPassOptions, selectedPassKey]);
+
+  const effectiveParkId = selectedPass?.parkId ?? null;
+  const effectiveDate = selectedPass?.date ?? null;
+  const effectiveTicketGuests = selectedPass?.guestCap ?? null;
 
   const [activities, setActivities] = useState<ParkActivity[]>([]);
   const [loadedActivitiesFor, setLoadedActivitiesFor] = useState<number | null>(
     null,
   );
   const [selectedActivityId, setSelectedActivityId] = useState<number | null>(
-    cart.parkActivity?.activity.id ?? null,
+    null,
   );
 
   const [schedules, setSchedules] = useState<ParkActivitySchedule[]>([]);
@@ -51,12 +123,10 @@ export function ParkActivityStep() {
     null,
   );
   const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(
-    cart.parkActivity?.schedule?.id ?? null,
+    null,
   );
 
-  const [guests, setGuests] = useState<number>(
-    cart.parkActivity?.guests ?? effectiveTicketGuests ?? 1,
-  );
+  const [guests, setGuests] = useState<number>(effectiveTicketGuests ?? 1);
   const [error, setError] = useState<string | null>(null);
 
   // Loading is derived: true while a selection is set but its fetch hasn't
@@ -106,6 +176,24 @@ export function ParkActivityStep() {
     };
   }, [effectiveParkId, selectedActivityId]);
 
+  // When the day-pass changes, drop activity/schedule selection — old
+  // park context's activities aren't relevant anymore. Render-time
+  // setState pattern (React's recommended alternative to a setState
+  // useEffect for "adjust state when context changes"); the loaded
+  // arrays clear so the picker doesn't briefly flash the previous
+  // park's activities while the new fetch lands.
+  const [prevPassKey, setPrevPassKey] = useState(selectedPassKey);
+  if (selectedPassKey !== prevPassKey) {
+    setPrevPassKey(selectedPassKey);
+    setSelectedActivityId(null);
+    setSelectedScheduleId(null);
+    setActivities([]);
+    setLoadedActivitiesFor(null);
+    setSchedules([]);
+    setLoadedSchedulesFor(null);
+    setError(null);
+  }
+
   const bookableSchedules = useMemo(() => {
     return schedules.filter((s) => {
       if (s.status !== "scheduled") return false;
@@ -128,8 +216,19 @@ export function ParkActivityStep() {
 
   const formIsTouched = selectedActivityId !== null;
 
+  const resetForm = () => {
+    setSelectedActivityId(null);
+    setSelectedScheduleId(null);
+    setGuests(effectiveTicketGuests ?? 1);
+    setError(null);
+  };
+
   const commitSelection = (): boolean => {
     setError(null);
+    if (!selectedPass) {
+      setError("Pick a day-pass first.");
+      return false;
+    }
     if (!selectedActivity) {
       setError("Pick an activity.");
       return false;
@@ -169,31 +268,31 @@ export function ParkActivityStep() {
         return false;
       }
     }
-    if (cartParkTicket && guests > cartParkTicket.guests) {
+    if (guests > selectedPass.guestCap) {
       setError(
-        `Activity guests (${guests}) exceed the day-pass guests (${cartParkTicket.guests}). Bump the day-pass first if more people are joining.`,
-      );
-      return false;
-    }
-    const matchingExistingDayPass = existingBookings.parkBookings.find(
-      (b) =>
-        b.park_id === effectiveParkId &&
-        b.date === activityDate &&
-        b.status === "confirmed",
-    );
-    if (matchingExistingDayPass && guests > matchingExistingDayPass.guests) {
-      setError(
-        `Activity guests (${guests}) exceed your existing day-pass guests (${matchingExistingDayPass.guests}) on ${activityDate}.`,
+        `Activity guests (${guests}) exceed the day-pass guests (${selectedPass.guestCap}) for ${selectedPass.parkName} on ${selectedPass.date}.`,
       );
       return false;
     }
 
     if (isAllDay) {
       if (!effectiveDate) {
-        setError("Add a park ticket first so we know which date to book.");
+        setError("No date is set on the selected day-pass.");
         return false;
       }
-      setParkActivity({
+      // Duplicate guard: same all-day activity for the same date already
+      // staged → 422 server-side. Detect cart-side first.
+      const dup = cart.parkActivities.some(
+        (a) =>
+          a.activity.id === selectedActivity.id && a.date === effectiveDate,
+      );
+      if (dup) {
+        setError(
+          "You already have this all-day activity on this date in your cart.",
+        );
+        return false;
+      }
+      addParkActivity({
         activity: selectedActivity,
         date: effectiveDate,
         guests,
@@ -208,7 +307,15 @@ export function ParkActivityStep() {
       setError("Pick a scheduled time.");
       return false;
     }
-    setParkActivity({
+    // Duplicate guard for timed flow — same schedule already in cart.
+    const stagedScheduleDup = cart.parkActivities.some(
+      (a) => a.schedule?.id === selectedSchedule.id,
+    );
+    if (stagedScheduleDup) {
+      setError("You already have this slot in your cart.");
+      return false;
+    }
+    addParkActivity({
       activity: selectedActivity,
       schedule: selectedSchedule,
       guests,
@@ -219,14 +326,74 @@ export function ParkActivityStep() {
     return true;
   };
 
-  const handleNext = (): boolean => {
-    // Untouched form on a non-last step = "skip this optional step".
-    // When this is the last reachable step (button reads "Add to cart")
-    // we must always commit so the customer gets validation feedback
-    // instead of a silent no-op.
-    if (hasNextStep && !formIsTouched && !cart.parkActivity) return true;
-    return commitSelection();
+  // Refs for scroll-on-change UX. After a successful add we scroll the
+  // form heading into view so the customer can SEE the form has reset.
+  // On a new error message we scroll the error into view.
+  const formHeadingRef = useRef<HTMLHeadingElement>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (error) {
+      errorRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [error]);
+
+  const handleAddAnother = () => {
+    if (commitSelection()) {
+      resetForm();
+      formHeadingRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
   };
+
+  const handleNext = (): boolean => {
+    if (!formIsTouched) {
+      // Untouched form on a non-last step = "skip this optional step".
+      // Last reachable step → require validation feedback.
+      if (hasNextStep) return true;
+      // No form, but if we have committed activities, allow advance.
+      if (cart.parkActivities.length > 0) return true;
+      return commitSelection();
+    }
+    if (!commitSelection()) return false;
+    resetForm();
+    return true;
+  };
+
+  // Ref assignment lives in an effect (no deps) — the react-hooks/refs
+  // rule bans ref writes during render.
+  const tryCommitRef = useRef<() => boolean>(() => true);
+  useEffect(() => {
+    tryCommitRef.current = (): boolean => {
+      if (!formIsTouched) return true;
+      if (!commitSelection()) return false;
+      resetForm();
+      return true;
+    };
+  });
+
+  useEffect(() => {
+    registerStepCommitter("park-activity", () => tryCommitRef.current());
+    return () => registerStepCommitter("park-activity", null);
+  }, [registerStepCommitter]);
+
+  // Schedule slots already taken by this same submit's other staged
+  // activities (each schedule_id can only be booked once per
+  // reservation). Existing-reservation conflicts come from
+  // existingBookings.parkActivityScheduleIds; we union the two so the
+  // picker doesn't let the user add the same slot twice.
+  const stagedScheduleIds = useMemo(() => {
+    return new Set(
+      cart.parkActivities
+        .map((a) => a.schedule?.id)
+        .filter((id): id is number => id !== undefined),
+    );
+  }, [cart.parkActivities]);
 
   return (
     <section className="card space-y-6">
@@ -235,68 +402,153 @@ export function ParkActivityStep() {
           Park activities
         </h2>
         <p className="text-muted text-sm">
-          {effectiveParkName
-            ? `Add-on experiences inside ${effectiveParkName}${
-                effectiveDate ? ` on ${effectiveDate}` : ""
-              }.`
-            : "Pick a park ticket first to see available activities."}
-          {!cartParkTicket && fallbackExistingPass ? (
-            <span className="block text-xs">
-              Using your existing day-pass on this trip.
-            </span>
-          ) : null}
+          Add-on experiences inside the parks you&rsquo;ve booked. Stack as
+          many activities as you like across your day-passes.
         </p>
       </header>
 
-      <div className="space-y-2">
-        <label className="block text-sm font-medium text-base-color">
-          Activity
-        </label>
-        {loadingActivities ? (
-          <p className="text-muted text-sm">Loading activities…</p>
-        ) : visibleActivities.length === 0 ? (
-          <p className="text-muted text-sm">
-            No activities are published for this park yet.
-          </p>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {visibleActivities.map((activity) => {
-              const active = selectedActivityId === activity.id;
+      {cart.parkActivities.length > 0 ? (
+        <div className="space-y-2">
+          <h3 className="text-base-color text-sm font-semibold">
+            Park activities in your cart
+          </h3>
+          <ul className="border-base divide-base divide-y rounded-lg border">
+            {cart.parkActivities.map((act, index) => {
+              const when = act.schedule
+                ? `${act.schedule.date} · ${act.schedule.start_time}`
+                : `${act.date ?? "—"} · all day`;
+              return (
+                <li
+                  key={`${act.activity.id}-${act.schedule?.id ?? act.date ?? ""}-${index}`}
+                  className="flex items-start justify-between gap-4 px-4 py-3"
+                >
+                  <div className="space-y-0.5 text-sm">
+                    <p className="text-primary font-semibold">
+                      {act.activity.name}
+                    </p>
+                    <p className="text-muted">
+                      {when} · {act.guests} guest
+                      {act.guests === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeParkActivity(index)}
+                    className="text-muted hover:text-danger flex items-center gap-1 text-xs font-semibold"
+                    aria-label="Remove park activity"
+                  >
+                    <Trash2 className="size-4" />
+                    Remove
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+
+      {dayPassOptions.length === 0 ? (
+        <p className="text-muted text-sm">
+          Add a park ticket first to see available activities.
+        </p>
+      ) : null}
+
+      {dayPassOptions.length > 1 ? (
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-base-color">
+            Day-pass to add activities under
+          </label>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {dayPassOptions.map((opt) => {
+              const active = selectedPassKey === opt.key;
               return (
                 <button
-                  key={activity.id}
+                  key={opt.key}
                   type="button"
-                  onClick={() => {
-                    setSelectedActivityId(activity.id);
-                    setSelectedScheduleId(null);
-                  }}
-                  className={`rounded-lg border p-4 text-left transition-colors ${
+                  onClick={() => setSelectedPassKey(opt.key)}
+                  className={`rounded-lg border p-3 text-left transition-colors ${
                     active
                       ? "border-primary bg-primary/5"
                       : "border-base hover:border-primary"
                   }`}
                   aria-pressed={active}
                 >
-                  <p className="font-semibold text-primary">{activity.name}</p>
-                  <p className="text-muted mt-1 text-sm">
-                    {activity.price !== null
-                      ? `$${activity.price}`
-                      : "Included"}
-                    {activity.duration
-                      ? ` · ${activity.duration} min`
-                      : activity.is_all_day
-                      ? " · all day"
-                      : ""}
-                    {activity.max_capacity
-                      ? ` · up to ${activity.max_capacity} per slot`
-                      : ""}
+                  <p className="text-primary text-sm font-semibold">
+                    {opt.parkName}
+                  </p>
+                  <p className="text-muted text-xs">
+                    {opt.date} · up to {opt.guestCap} guest
+                    {opt.guestCap === 1 ? "" : "s"}
+                    {opt.source === "existing" ? " · already on trip" : ""}
                   </p>
                 </button>
               );
             })}
           </div>
-        )}
-      </div>
+        </div>
+      ) : null}
+
+      {dayPassOptions.length > 0 ? (
+        <div className="space-y-2">
+          <h3
+            ref={formHeadingRef}
+            className="text-base-color scroll-mt-24 text-sm font-semibold"
+          >
+            {cart.parkActivities.length === 0
+              ? "Pick an activity"
+              : "Add another activity"}
+          </h3>
+          <label className="block text-sm font-medium text-base-color">
+            Activity
+          </label>
+          {loadingActivities ? (
+            <p className="text-muted text-sm">Loading activities…</p>
+          ) : visibleActivities.length === 0 ? (
+            <p className="text-muted text-sm">
+              No activities are published for this park yet.
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {visibleActivities.map((activity) => {
+                const active = selectedActivityId === activity.id;
+                return (
+                  <button
+                    key={activity.id}
+                    type="button"
+                    onClick={() => {
+                      // Toggle: clicking the active tile deselects so
+                      // the customer can back out of the form.
+                      setSelectedActivityId(active ? null : activity.id);
+                      setSelectedScheduleId(null);
+                    }}
+                    className={`rounded-lg border p-4 text-left transition-colors ${
+                      active
+                        ? "border-primary bg-primary/5"
+                        : "border-base hover:border-primary"
+                    }`}
+                    aria-pressed={active}
+                  >
+                    <p className="font-semibold text-primary">{activity.name}</p>
+                    <p className="text-muted mt-1 text-sm">
+                      {activity.price !== null
+                        ? `$${activity.price}`
+                        : "Included"}
+                      {activity.duration
+                        ? ` · ${activity.duration} min`
+                        : activity.is_all_day
+                        ? " · all day"
+                        : ""}
+                      {activity.max_capacity
+                        ? ` · up to ${activity.max_capacity} per slot`
+                        : ""}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : null}
 
       {selectedActivityId !== null && isAllDay ? (
         <div className="border-base bg-base/30 space-y-1 rounded-lg border p-3 text-sm">
@@ -305,7 +557,7 @@ export function ParkActivityStep() {
             No time slot to pick — admission runs the full day.{" "}
             {effectiveDate
               ? `Booked for ${effectiveDate} alongside your day-pass.`
-              : "Add a park ticket first to set the date."}
+              : ""}
           </p>
         </div>
       ) : null}
@@ -329,14 +581,16 @@ export function ParkActivityStep() {
                 const active = selectedScheduleId === s.id;
                 const alreadyBooked =
                   existingBookings.parkActivityScheduleIds.has(s.id);
+                const alreadyStaged = stagedScheduleIds.has(s.id);
+                const disabled = alreadyBooked || alreadyStaged;
                 return (
                   <button
                     key={s.id}
                     type="button"
-                    disabled={alreadyBooked}
+                    disabled={disabled}
                     onClick={() => setSelectedScheduleId(s.id)}
                     className={`rounded-lg border p-3 text-left text-sm transition-colors ${
-                      alreadyBooked
+                      disabled
                         ? "border-base bg-base/40 opacity-60 cursor-not-allowed"
                         : active
                         ? "border-primary bg-primary/5"
@@ -348,7 +602,11 @@ export function ParkActivityStep() {
                     <p className="text-muted">
                       {s.start_time ?? "—"}
                       {s.end_time ? ` – ${s.end_time}` : ""}
-                      {alreadyBooked ? " · Already booked" : ""}
+                      {alreadyBooked
+                        ? " · Already booked"
+                        : alreadyStaged
+                        ? " · In your cart"
+                        : ""}
                     </p>
                   </button>
                 );
@@ -358,36 +616,70 @@ export function ParkActivityStep() {
         </div>
       ) : null}
 
-      <div className="max-w-xs">
-        <label
-          htmlFor="park-activity-guests"
-          className="block text-sm font-medium text-base-color"
-        >
-          Guests
-        </label>
-        <Input
-          id="park-activity-guests"
-          type="number"
-          min={1}
-          max={selectedActivity?.max_capacity ?? 50}
-          className="mt-2"
-          value={guests}
-          onChange={(e) => setGuests(Number(e.target.value))}
-        />
-      </div>
+      {selectedActivityId !== null ? (
+        <div className="max-w-xs">
+          <label
+            htmlFor="park-activity-guests"
+            className="block text-sm font-medium text-base-color"
+          >
+            Guests
+          </label>
+          <Input
+            id="park-activity-guests"
+            type="number"
+            min={1}
+            max={selectedActivity?.max_capacity ?? 50}
+            className="mt-2"
+            value={guests}
+            onChange={(e) => setGuests(Number(e.target.value))}
+          />
+        </div>
+      ) : null}
 
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      {error ? (
+        <p
+          ref={errorRef}
+          className="scroll-mt-24 text-sm text-danger"
+          role="alert"
+        >
+          {error}
+        </p>
+      ) : null}
+
+      {dayPassOptions.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            className="btn-primary inline-flex items-center gap-2"
+            onClick={handleAddAnother}
+          >
+            <Plus className="size-4" aria-hidden />
+            {cart.parkActivities.length === 0
+              ? "Save activity"
+              : "Save & add another"}
+          </button>
+          {formIsTouched ? (
+            <button
+              type="button"
+              className="text-base-color hover:bg-base/40 rounded-lg border border-base px-4 py-2 text-sm font-semibold transition-colors"
+              onClick={resetForm}
+            >
+              Cancel
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       <StepNav
         onNext={handleNext}
         leadingActions={
-          cart.parkActivity ? (
+          cart.parkActivities.length > 0 ? (
             <button
               type="button"
               className="text-sm font-semibold text-danger hover:opacity-80"
-              onClick={() => setParkActivity(null)}
+              onClick={clearParkActivities}
             >
-              Clear activity
+              Clear all activities
             </button>
           ) : null
         }

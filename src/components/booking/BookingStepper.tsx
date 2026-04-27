@@ -24,21 +24,31 @@ type BookingStepperProps = {
 };
 
 export function BookingStepper({ active, onChange }: BookingStepperProps) {
-  const { cart, isStepUnlocked } = useBookingCart();
+  const { cart, isStepUnlocked, tryCommitActiveStep } = useBookingCart();
 
   const isDone = (step: BookingStep) => {
     switch (step) {
       case "room":
         return cart.rooms.length > 0;
       case "ferry":
-        return cart.ferry !== null;
+        return cart.ferries.length > 0;
       case "park-ticket":
-        return cart.parkTicket !== null;
+        return cart.parkTickets.length > 0;
       case "park-activity":
-        return cart.parkActivity !== null;
+        return cart.parkActivities.length > 0;
       case "beach-activity":
-        return cart.beachActivity !== null;
+        return cart.beachActivities.length > 0;
     }
+  };
+
+  // Tab click runs the active step's tryCommit() first so any partially
+  // filled form is saved (or surfaces a validation error and blocks)
+  // before we navigate away. Same step click skips the commit — clicking
+  // your own tab shouldn't validate.
+  const handleTabClick = (target: BookingStep) => {
+    if (target === active) return;
+    if (!tryCommitActiveStep()) return;
+    onChange(target);
   };
 
   return (
@@ -60,7 +70,7 @@ export function BookingStepper({ active, onChange }: BookingStepperProps) {
             aria-selected={isActive}
             aria-disabled={!unlocked}
             disabled={!unlocked}
-            onClick={() => unlocked && onChange(step.key)}
+            onClick={() => unlocked && handleTabClick(step.key)}
             className={`flex min-w-[10rem] flex-1 flex-col items-start gap-1 rounded-md px-3 py-2 text-left text-sm transition-colors ${
               isActive
                 ? "bg-primary text-white"

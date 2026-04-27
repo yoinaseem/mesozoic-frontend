@@ -13,7 +13,11 @@
 import type { BookingCart, BookingStep } from "@/types/booking";
 
 const STORAGE_PREFIX = "mesozoic.cart.";
-const SCHEMA_VERSION = 1;
+// v2: parkTicket/parkActivity/beachActivity flipped from single nullable
+// slots to plural arrays. v3: same flip for ferry → ferries[]. Each
+// schema bump just discards stale carts (loadCart returns null on
+// version mismatch) so the customer starts fresh — no migration code.
+const SCHEMA_VERSION = 3;
 const TTL_MS = 72 * 60 * 60 * 1000;
 
 export type StoredCartPayload = {
@@ -110,7 +114,13 @@ export function clearCart(userId: number): void {
 // tickets is treated as "empty" — there's nothing to resume.
 export function hasStagedItems(payload: StoredCartPayload): boolean {
   const { cart } = payload;
-  if (cart.ferry || cart.parkTicket || cart.parkActivity || cart.beachActivity)
+  if (
+    cart.ferries.length > 0 ||
+    cart.parkTickets.length > 0 ||
+    cart.parkActivities.length > 0 ||
+    cart.beachActivities.length > 0
+  ) {
     return true;
+  }
   return cart.rooms.some((r) => r.existingId === undefined);
 }

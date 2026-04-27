@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { StepNav } from "@/components/booking/StepNav";
@@ -42,27 +43,28 @@ function formatDateDdMmYyyy(date: string): string {
 export function ThemeParkStep() {
   const {
     cart,
-    setParkTicket,
+    addParkTicket,
+    removeParkTicket,
+    clearParkTickets,
     existingBookings,
     primaryRoom,
     tripWindow,
     hasNextStep,
+    registerStepCommitter,
   } = useBookingCart();
   const minVisitDate = tripWindow?.checkIn ?? todayIso();
-  const maxVisitDate = tripWindow ? previousDayIso(tripWindow.checkOut) : undefined;
+  const maxVisitDate = tripWindow
+    ? previousDayIso(tripWindow.checkOut)
+    : undefined;
 
   const [parks, setParks] = useState<ThemePark[]>([]);
   const [loadingParks, setLoadingParks] = useState(true);
-  const [selectedParkId, setSelectedParkId] = useState<number | null>(
-    cart.parkTicket?.park.id ?? null,
-  );
+  const [selectedParkId, setSelectedParkId] = useState<number | null>(null);
 
   const [visitDate, setVisitDate] = useState<string>(
-    cart.parkTicket?.visitDate ?? tripWindow?.checkIn ?? todayIso(),
+    tripWindow?.checkIn ?? todayIso(),
   );
-  const [guests, setGuests] = useState<number>(
-    cart.parkTicket?.guests ?? primaryRoom?.guests ?? 1,
-  );
+  const [guests, setGuests] = useState<number>(primaryRoom?.guests ?? 1);
 
   const [hours, setHours] = useState<EffectiveHour | null>(null);
   const [hoursLoadedFor, setHoursLoadedFor] = useState<string | null>(null);
@@ -115,6 +117,15 @@ export function ThemeParkStep() {
 
   const formIsTouched = selectedParkId !== null;
 
+  const resetForm = () => {
+    setSelectedParkId(null);
+    setVisitDate(tripWindow?.checkIn ?? todayIso());
+    setGuests(primaryRoom?.guests ?? 1);
+    setHours(null);
+    setHoursLoadedFor(null);
+    setError(null);
+  };
+
   const commitSelection = (): boolean => {
     setError(null);
     if (!selectedPark) {
@@ -136,6 +147,17 @@ export function ThemeParkStep() {
         );
         return false;
       }
+    }
+    // Duplicate check across both staged AND already-confirmed tickets:
+    // booking the same (park, date) pair twice is always a 422 server-side.
+    const stagedDup = cart.parkTickets.some(
+      (t) => t.park.id === selectedPark.id && t.visitDate === visitDate,
+    );
+    if (stagedDup) {
+      setError(
+        "You already have a day-pass for this park on this date in your cart.",
+      );
+      return false;
     }
     if (existingBookings.parkDates.has(`${selectedPark.id}|${visitDate}`)) {
       setError(
@@ -168,21 +190,80 @@ export function ThemeParkStep() {
       );
       return false;
     }
-    setParkTicket({ park: selectedPark, visitDate, guests });
+    addParkTicket({ park: selectedPark, visitDate, guests });
     toast.success(
       `Added to cart: ${selectedPark.name} · ${visitDate} · ${guests} guest${guests === 1 ? "" : "s"}`,
     );
     return true;
   };
 
-  const handleNext = (): boolean => {
+  // Refs for scroll-on-change UX. After a successful add we scroll the
+  // form heading into view so the customer can SEE the form has reset
+  // (otherwise the cleared inputs sit below the fold and feel like the
+  // click did nothing). On a new error message we scroll the error into
+  // view so it isn't hidden below the inputs.
+  const formHeadingRef = useRef<HTMLHeadingElement>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (error) {
+      errorRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [error]);
+
+  // Add another ticket — commit the form and reset for a new entry.
+  // Doesn't navigate; the customer keeps adding until they pick Next.
+  const handleAddAnother = () => {
+    if (commitSelection()) {
+      resetForm();
+      formHeadingRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  };
+
+  // Next: when the form has data, commit it before advancing. We return
+  // the explicit "park-activity" target so navigation lands on the now-
+  // unlocked activity step instead of skipping to beach (the default
+  // goToNextStep would still see the pre-commit cart and treat
+  // park-activity as locked).
+  const handleNext = () => {
+    if (formIsTouched) {
+      if (!commitSelection()) return false as const;
+      resetForm();
+      return "park-activity" as const;
+    }
+    if (cart.parkTickets.length > 0) {
+      return "park-activity" as const;
+    }
     // Untouched form on a non-last step = "skip this optional step".
-    // When this is the last reachable step (button reads "Add to cart")
-    // we must always commit so the customer gets validation feedback
-    // instead of a silent no-op.
-    if (hasNextStep && !formIsTouched && !cart.parkTicket) return true;
+    if (hasNextStep) return true as const;
+    // Last reachable step → require validation feedback.
     return commitSelection();
   };
+
+  // Tab-navigation auto-commit. Untouched form: no-op true. Touched:
+  // commit (validates first; failure blocks navigation with the same
+  // error message). Ref assignment lives in an effect (no deps) — the
+  // react-hooks/refs rule bans ref writes during render.
+  const tryCommitRef = useRef<() => boolean>(() => true);
+  useEffect(() => {
+    tryCommitRef.current = (): boolean => {
+      if (!formIsTouched) return true;
+      if (!commitSelection()) return false;
+      resetForm();
+      return true;
+    };
+  });
+
+  useEffect(() => {
+    registerStepCommitter("park-ticket", () => tryCommitRef.current());
+    return () => registerStepCommitter("park-ticket", null);
+  }, [registerStepCommitter]);
 
   return (
     <section className="card space-y-6">
@@ -191,12 +272,55 @@ export function ThemeParkStep() {
           Theme park tickets
         </h2>
         <p className="text-muted text-sm">
-          Reserve park tickets for a specific date. Individual park activities
-          unlock once a ticket is in your cart.
+          Reserve park tickets for specific dates. Add as many as you like —
+          park activities unlock once at least one ticket is in your cart.
         </p>
       </header>
 
+      {cart.parkTickets.length > 0 ? (
+        <div className="space-y-2">
+          <h3 className="text-base-color text-sm font-semibold">
+            Park tickets in your cart
+          </h3>
+          <ul className="border-base divide-base divide-y rounded-lg border">
+            {cart.parkTickets.map((ticket, index) => (
+              <li
+                key={`${ticket.park.id}-${ticket.visitDate}-${index}`}
+                className="flex items-start justify-between gap-4 px-4 py-3"
+              >
+                <div className="space-y-0.5 text-sm">
+                  <p className="text-primary font-semibold">
+                    {ticket.park.name}
+                  </p>
+                  <p className="text-muted">
+                    {ticket.visitDate} · {ticket.guests} guest
+                    {ticket.guests === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeParkTicket(index)}
+                  className="text-muted hover:text-danger flex items-center gap-1 text-xs font-semibold"
+                  aria-label="Remove park ticket"
+                >
+                  <Trash2 className="size-4" />
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       <div className="space-y-2">
+        <h3
+          ref={formHeadingRef}
+          className="text-base-color scroll-mt-24 text-sm font-semibold"
+        >
+          {cart.parkTickets.length === 0
+            ? "Pick a theme park"
+            : "Add another ticket"}
+        </h3>
         <label className="block text-sm font-medium text-base-color">
           Theme park
         </label>
@@ -212,7 +336,9 @@ export function ThemeParkStep() {
                 <button
                   key={park.id}
                   type="button"
-                  onClick={() => setSelectedParkId(park.id)}
+                  onClick={() =>
+                    setSelectedParkId(active ? null : park.id)
+                  }
                   className={`rounded-lg border p-4 text-left transition-colors ${
                     active
                       ? "border-primary bg-primary/5"
@@ -291,18 +417,53 @@ export function ThemeParkStep() {
         </p>
       ) : null}
 
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      {error ? (
+        <p
+          ref={errorRef}
+          className="scroll-mt-24 text-sm text-danger"
+          role="alert"
+        >
+          {error}
+        </p>
+      ) : null}
+
+      {/* Save & add another — prominent inline button that commits the
+          current form and gives the customer a fresh form to enter the
+          next ticket without leaving the step. Lives in the form area
+          (not the StepNav footer) so it reads as a form action rather
+          than navigation. */}
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          className="btn-primary inline-flex items-center gap-2"
+          onClick={handleAddAnother}
+        >
+          <Plus className="size-4" aria-hidden />
+          {cart.parkTickets.length === 0
+            ? "Save ticket"
+            : "Save & add another"}
+        </button>
+        {formIsTouched ? (
+          <button
+            type="button"
+            className="text-base-color hover:bg-base/40 rounded-lg border border-base px-4 py-2 text-sm font-semibold transition-colors"
+            onClick={resetForm}
+          >
+            Cancel
+          </button>
+        ) : null}
+      </div>
 
       <StepNav
         onNext={handleNext}
         leadingActions={
-          cart.parkTicket ? (
+          cart.parkTickets.length > 0 ? (
             <button
               type="button"
               className="text-sm font-semibold text-danger hover:opacity-80"
-              onClick={() => setParkTicket(null)}
+              onClick={clearParkTickets}
             >
-              Clear park ticket
+              Clear all tickets
             </button>
           ) : null
         }

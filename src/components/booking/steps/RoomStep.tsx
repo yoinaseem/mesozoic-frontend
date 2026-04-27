@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { StepNav } from "@/components/booking/StepNav";
@@ -29,8 +29,14 @@ function isoDaysFromNow(days: number): string {
 }
 
 export function RoomStep() {
-  const { cart, addRoom, removeRoom, clearRooms, roomAlreadyExists } =
-    useBookingCart();
+  const {
+    cart,
+    addRoom,
+    removeRoom,
+    clearRooms,
+    roomAlreadyExists,
+    registerStepCommitter,
+  } = useBookingCart();
 
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loadingHotels, setLoadingHotels] = useState(true);
@@ -236,9 +242,30 @@ export function RoomStep() {
     setError(null);
   };
 
+  // Refs for scroll-on-change UX. After a successful add we scroll the
+  // form heading into view so the customer can SEE the form has reset
+  // (without this, the cleared inputs sit below the fold and clicking
+  // Save feels like it did nothing). On a new error we scroll the
+  // error into view so it isn't hidden under the inputs.
+  const formHeadingRef = useRef<HTMLHeadingElement>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (error) {
+      errorRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [error]);
+
   const handleAddAnother = () => {
     if (commitRoom()) {
       resetForm();
+      formHeadingRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     }
   };
 
@@ -249,7 +276,9 @@ export function RoomStep() {
   //  - If the form is untouched and no rooms are in cart, error.
   const handleNext = (): boolean => {
     if (formIsTouched) {
-      return commitRoom();
+      if (!commitRoom()) return false;
+      resetForm();
+      return true;
     }
     if (cart.rooms.length === 0) {
       setError("Add at least one room before continuing.");
@@ -257,6 +286,28 @@ export function RoomStep() {
     }
     return true;
   };
+
+  // Auto-commit hook for tab navigation. Same logic as handleNext minus
+  // the min-room check (the stepper already locks downstream tabs when
+  // no room is added). A ref-shim wraps the latest closure so the
+  // registered function always sees fresh form state — assignment
+  // happens in an effect (no deps) so it runs after every commit and
+  // doesn't trip the react-hooks/refs rule that bans ref writes during
+  // render.
+  const tryCommitRef = useRef<() => boolean>(() => true);
+  useEffect(() => {
+    tryCommitRef.current = (): boolean => {
+      if (!formIsTouched) return true;
+      if (!commitRoom()) return false;
+      resetForm();
+      return true;
+    };
+  });
+
+  useEffect(() => {
+    registerStepCommitter("room", () => tryCommitRef.current());
+    return () => registerStepCommitter("room", null);
+  }, [registerStepCommitter]);
 
   return (
     <section className="card space-y-6">
@@ -305,7 +356,10 @@ export function RoomStep() {
       ) : null}
 
       <div className="space-y-2">
-        <h3 className="text-base-color text-sm font-semibold">
+        <h3
+          ref={formHeadingRef}
+          className="text-base-color scroll-mt-24 text-sm font-semibold"
+        >
           {cart.rooms.length === 0 ? "Pick a room" : "Add another room"}
         </h3>
         <label className="block text-sm font-medium text-base-color">
@@ -324,6 +378,18 @@ export function RoomStep() {
                   key={hotel.id}
                   type="button"
                   onClick={() => {
+                    // Toggle: clicking the active hotel deselects it so
+                    // the customer can back out of the form without
+                    // refreshing the page.
+                    if (active) {
+                      setSelectedHotelId(null);
+                      setSelectedRoomTypeId(null);
+                      setHotelDetail(null);
+                      setHotelDetailFor(null);
+                      setCheckIn(null);
+                      setCheckOut(null);
+                      return;
+                    }
                     setSelectedHotelId(hotel.id);
                     setSelectedRoomTypeId(null);
                     setCheckIn(null);
@@ -367,6 +433,13 @@ export function RoomStep() {
                     key={rt.id}
                     type="button"
                     onClick={() => {
+                      // Toggle: clicking the active room type deselects.
+                      if (active) {
+                        setSelectedRoomTypeId(null);
+                        setCheckIn(null);
+                        setCheckOut(null);
+                        return;
+                      }
                       setSelectedRoomTypeId(rt.id);
                       setCheckIn(null);
                       setCheckOut(null);
@@ -445,31 +518,54 @@ export function RoomStep() {
         </div>
       </div>
 
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      {error ? (
+        <p
+          ref={errorRef}
+          className="scroll-mt-24 text-sm text-danger"
+          role="alert"
+        >
+          {error}
+        </p>
+      ) : null}
+
+      {/* Save & add another lives in the form area (not the StepNav
+          footer) so it reads as a form action rather than navigation —
+          the customer can stack rooms without ever leaving this step. */}
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          className="btn-primary inline-flex items-center gap-2"
+          onClick={handleAddAnother}
+        >
+          <Plus className="size-4" aria-hidden />
+          {cart.rooms.length === 0 ? "Save room" : "Save & add another"}
+        </button>
+        {/* Discard partially-filled form input — important when the
+            customer has rooms in cart, clicked "Add another room",
+            started filling, then changed their mind. */}
+        {formIsTouched ? (
+          <button
+            type="button"
+            className="text-base-color hover:bg-base/40 rounded-lg border border-base px-4 py-2 text-sm font-semibold transition-colors"
+            onClick={resetForm}
+          >
+            Cancel
+          </button>
+        ) : null}
+      </div>
 
       <StepNav
         onNext={handleNext}
         leadingActions={
-          <>
+          cart.rooms.length > 0 && !roomAlreadyExists ? (
             <button
               type="button"
-              className="border-primary text-primary hover:bg-primary/5 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors"
-              onClick={handleAddAnother}
+              className="text-sm font-semibold text-danger hover:opacity-80"
+              onClick={clearRooms}
             >
-              {cart.rooms.length === 0
-                ? "Add this room"
-                : "Add another room"}
+              Clear all rooms
             </button>
-            {cart.rooms.length > 0 && !roomAlreadyExists ? (
-              <button
-                type="button"
-                className="text-sm font-semibold text-danger hover:opacity-80"
-                onClick={clearRooms}
-              >
-                Clear all rooms
-              </button>
-            ) : null}
-          </>
+          ) : null
         }
       />
     </section>
