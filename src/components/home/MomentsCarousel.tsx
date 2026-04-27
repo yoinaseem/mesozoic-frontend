@@ -10,26 +10,27 @@ const PLACEHOLDER =
 
 const SLIDES = [
   {
-    image: PLACEHOLDER,
+    image: "/img/home-carousel-stay.png",
     overline: "Stay",
     title: "Wake among the canopies",
     caption: "Treetop sanctuaries where mornings begin with mist and birdsong.",
   },
   {
-    image: PLACEHOLDER,
+    image: "/img/home-carousel-explore.png",
     overline: "Explore",
     title: "Walk with giants",
+    objectPosition: "50% 36%",
     caption:
       "Step into the Kingdom and meet the ancients on guided expeditions.",
   },
   {
-    image: PLACEHOLDER,
+    image: "/img/home-carousel-discover.png",
     overline: "Discover",
     title: "Where reefs meet wonder",
     caption: "Drift through living color on the island's shimmering shores.",
   },
   {
-    image: PLACEHOLDER,
+    image: "/img/home-carousel-unwind.png",
     overline: "Unwind",
     title: "Sunset on ancient shores",
     caption: "End the day where time stands still and the sky catches fire.",
@@ -97,6 +98,11 @@ export function MomentsCarousel() {
                       src={slide.image}
                       alt={slide.title}
                       className="absolute inset-0 h-full w-full object-cover"
+                      style={
+                        slide.objectPosition
+                          ? { objectPosition: slide.objectPosition }
+                          : undefined
+                      }
                     />
                     <div
                       className="absolute inset-0 bg-black/40 dark:bg-black/20"

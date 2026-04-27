@@ -1,4 +1,3 @@
-import Link from "next/link";
 import Image from "next/image";
 import { FALLBACK_IMAGE, resolveImage } from "@/lib/imageSrc";
 import type { RoomType } from "@/types/booking";
@@ -41,11 +40,6 @@ export function RoomCard({ roomType }: RoomCardProps) {
           Price per night:{" "}
           <span className="font-semibold text-primary">{formatPrice(roomType.price)}</span>
         </p>
-        <div className="mt-4">
-          <Link href="/book" className="btn-accent inline-block">
-            Book Now
-          </Link>
-        </div>
       </div>
     </article>
   );
