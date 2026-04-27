@@ -4,6 +4,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Label,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -44,11 +45,11 @@ export function SpendOverTimeChart({ data }: Props) {
           No spend in the last 12 months yet.
         </p>
       ) : (
-        <div className="h-56">
+        <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data}
-              margin={{ top: 8, right: 4, left: 0, bottom: 0 }}
+              margin={{ top: 8, right: 12, left: 12, bottom: 24 }}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -57,19 +58,43 @@ export function SpendOverTimeChart({ data }: Props) {
               />
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 11, fill: "var(--color-muted)" }}
+                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                 tickLine={false}
                 axisLine={false}
-              />
+              >
+                <Label
+                  value="Month"
+                  position="insideBottom"
+                  offset={-12}
+                  style={{
+                    fontSize: 12,
+                    fill: "var(--foreground)",
+                    fontWeight: 600,
+                  }}
+                />
+              </XAxis>
               <YAxis
-                tick={{ fontSize: 11, fill: "var(--color-muted)" }}
+                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                 tickFormatter={(v: number) =>
                   v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`
                 }
                 tickLine={false}
                 axisLine={false}
-                width={40}
-              />
+                width={56}
+              >
+                <Label
+                  value="Revenue (USD)"
+                  angle={-90}
+                  position="insideLeft"
+                  offset={10}
+                  style={{
+                    fontSize: 12,
+                    fill: "var(--foreground)",
+                    fontWeight: 600,
+                    textAnchor: "middle",
+                  }}
+                />
+              </YAxis>
               <Tooltip
                 cursor={{ fill: "var(--color-base)", opacity: 0.4 }}
                 contentStyle={{

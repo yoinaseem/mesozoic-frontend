@@ -4,6 +4,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Label,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -16,6 +17,9 @@ type Props = {
   data: DateCount[];
   title: string;
   subtitle?: string;
+  // What we're counting on the Y axis. Defaults to "Bookings" so the existing
+  // call sites keep their previous label without changes.
+  yAxisLabel?: string;
 };
 
 function shortLabel(iso: string): string {
@@ -29,7 +33,12 @@ function shortLabel(iso: string): string {
   }
 }
 
-export function Next7DaysChart({ data, title, subtitle }: Props) {
+export function Next7DaysChart({
+  data,
+  title,
+  subtitle,
+  yAxisLabel = "Bookings",
+}: Props) {
   const total = data.reduce((acc, d) => acc + d.count, 0);
   const labelled = data.map((d) => ({ ...d, label: shortLabel(d.date) }));
 
@@ -48,11 +57,11 @@ export function Next7DaysChart({ data, title, subtitle }: Props) {
           Nothing booked in the next 7 days.
         </p>
       ) : (
-        <div className="h-44">
+        <div className="h-56">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={labelled}
-              margin={{ top: 8, right: 4, left: 0, bottom: 0 }}
+              margin={{ top: 8, right: 12, left: 12, bottom: 24 }}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -61,17 +70,41 @@ export function Next7DaysChart({ data, title, subtitle }: Props) {
               />
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 11, fill: "var(--color-muted)" }}
+                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                 tickLine={false}
                 axisLine={false}
-              />
+              >
+                <Label
+                  value="Date"
+                  position="insideBottom"
+                  offset={-12}
+                  style={{
+                    fontSize: 12,
+                    fill: "var(--foreground)",
+                    fontWeight: 600,
+                  }}
+                />
+              </XAxis>
               <YAxis
                 allowDecimals={false}
-                tick={{ fontSize: 11, fill: "var(--color-muted)" }}
+                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                 tickLine={false}
                 axisLine={false}
-                width={28}
-              />
+                width={48}
+              >
+                <Label
+                  value={yAxisLabel}
+                  angle={-90}
+                  position="insideLeft"
+                  offset={10}
+                  style={{
+                    fontSize: 12,
+                    fill: "var(--foreground)",
+                    fontWeight: 600,
+                    textAnchor: "middle",
+                  }}
+                />
+              </YAxis>
               <Tooltip
                 cursor={{ fill: "var(--color-base)", opacity: 0.4 }}
                 contentStyle={{

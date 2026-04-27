@@ -4,6 +4,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Label,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -33,12 +34,12 @@ export function TopHotelsChart({ data }: Props) {
           No hotel revenue yet.
         </p>
       ) : (
-        <div className="h-56">
+        <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data}
               layout="vertical"
-              margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+              margin={{ top: 8, right: 16, left: 8, bottom: 28 }}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -47,21 +48,45 @@ export function TopHotelsChart({ data }: Props) {
               />
               <XAxis
                 type="number"
-                tick={{ fontSize: 11, fill: "var(--color-muted)" }}
+                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                 tickFormatter={(v: number) =>
                   v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`
                 }
                 tickLine={false}
                 axisLine={false}
-              />
+              >
+                <Label
+                  value="Revenue (USD)"
+                  position="insideBottom"
+                  offset={-16}
+                  style={{
+                    fontSize: 12,
+                    fill: "var(--foreground)",
+                    fontWeight: 600,
+                  }}
+                />
+              </XAxis>
               <YAxis
                 type="category"
                 dataKey="name"
-                tick={{ fontSize: 11, fill: "var(--color-muted)" }}
+                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                 tickLine={false}
                 axisLine={false}
-                width={120}
-              />
+                width={140}
+              >
+                <Label
+                  value="Hotel"
+                  angle={-90}
+                  position="insideLeft"
+                  offset={-4}
+                  style={{
+                    fontSize: 12,
+                    fill: "var(--foreground)",
+                    fontWeight: 600,
+                    textAnchor: "middle",
+                  }}
+                />
+              </YAxis>
               <Tooltip
                 cursor={{ fill: "var(--color-base)", opacity: 0.4 }}
                 contentStyle={{

@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarRange, Waves } from "lucide-react";
+import { CalendarClock, CalendarRange, Waves } from "lucide-react";
 
 import { StatTile } from "@/components/dashboard/StatTile";
 import { Next7DaysChart } from "@/components/admin-dashboard/Next7DaysChart";
@@ -40,6 +40,14 @@ export function BeachManagerView({ snapshot }: Props) {
     (i) => i.type === "beach",
   );
 
+  const totalSchedules = snapshot.beachActivities.reduce(
+    (acc, a) => acc + (a.schedules_count ?? a.schedules?.length ?? 0),
+    0,
+  );
+  const totalConfirmedBookings = snapshot.beachBookings.filter(
+    (b) => b.status === "confirmed",
+  ).length;
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -57,9 +65,21 @@ export function BeachManagerView({ snapshot }: Props) {
           icon={CalendarRange}
         />
         <StatTile
-          label="Total activities"
+          label="Activities"
           value={String(snapshot.beachActivities.length)}
           hint="Published catalogue entries"
+        />
+        <StatTile
+          label="Schedules"
+          value={String(totalSchedules)}
+          hint="Active session slots"
+          icon={CalendarClock}
+        />
+        <StatTile
+          label="Confirmed bookings"
+          value={String(totalConfirmedBookings)}
+          hint="Lifetime, all activities"
+          accent="primary"
         />
         <StatTile
           label="Top activity"

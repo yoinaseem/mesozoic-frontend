@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { FALLBACK_IMAGE, resolveImage } from "@/lib/imageSrc";
 import type { Hotel } from "@/types/booking";
 
 interface AccommodationFeatureProps {
@@ -8,10 +7,8 @@ interface AccommodationFeatureProps {
 }
 
 export function AccommodationFeature({ hotels }: AccommodationFeatureProps) {
-  const resolved = hotels.map((h) => resolveImage(h));
-  const withImages = resolved.filter((src): src is string => Boolean(src));
-  const primaryImage = withImages[0] ?? resolved[0] ?? FALLBACK_IMAGE;
-  const secondaryImage = withImages[1] ?? resolved[1] ?? primaryImage;
+  const primaryImage = "/img/stay-wide.png";
+  const secondaryImage = "/img/stay-detail.png";
 
   return (
     <section className="bg-primary-deep border-base border-t py-20 md:py-24">

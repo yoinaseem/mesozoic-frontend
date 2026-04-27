@@ -66,8 +66,8 @@
 
 /* Dark mode */
 .dark {
-  --color-bg: #171717;
-  --color-surface: #262626;
+  --color-bg: #0e0e0e;
+  --color-surface: #161616;
 
   --color-primary: #52a87a;
   --color-primary-deep: #0d1f15;

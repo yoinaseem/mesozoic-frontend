@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { FALLBACK_IMAGE, resolveImage } from "@/lib/imageSrc";
 import type { ParkActivity } from "@/types/booking";
 
 interface KingdomFeatureProps {
@@ -8,9 +7,7 @@ interface KingdomFeatureProps {
 }
 
 export function KingdomFeature({ activities }: KingdomFeatureProps) {
-  const heroImage =
-    activities.map((a) => resolveImage(a)).find((src) => Boolean(src)) ||
-    FALLBACK_IMAGE;
+  const heroImage = "/img/explore-kingdom-hero.png";
 
   return (
     <section className="bg-base border-base border-t py-20 md:py-24">
