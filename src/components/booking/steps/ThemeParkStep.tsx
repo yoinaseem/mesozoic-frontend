@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
+
 import { StepNav } from "@/components/booking/StepNav";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { useBookingCart } from "@/context/booking-cart-context";
 import { getEffectiveHours, listThemeParks } from "@/lib/api/theme-parks";
+import { seatPoolOn } from "@/lib/seat-pool";
 import type { EffectiveHour, ThemePark } from "@/types/booking";
 
 function todayIso(): string {
@@ -37,8 +40,14 @@ function formatDateDdMmYyyy(date: string): string {
 }
 
 export function ThemeParkStep() {
-  const { cart, setParkTicket, existingBookings, primaryRoom, tripWindow } =
-    useBookingCart();
+  const {
+    cart,
+    setParkTicket,
+    existingBookings,
+    primaryRoom,
+    tripWindow,
+    hasNextStep,
+  } = useBookingCart();
   const minVisitDate = tripWindow?.checkIn ?? todayIso();
   const maxVisitDate = tripWindow ? previousDayIso(tripWindow.checkOut) : undefined;
 
@@ -142,12 +151,36 @@ export function ThemeParkStep() {
       setError("At least one guest is required.");
       return false;
     }
+    // Reservation seat pool — guests must fit inside the sum of confirmed
+    // room guests covering this date. API §12 enforces the same rule and
+    // would 422 on `errors.guests`; we surface it here so the customer
+    // doesn't learn about it at checkout.
+    const pool = seatPoolOn(cart.rooms, visitDate);
+    if (pool === 0) {
+      setError(
+        `No room covers ${visitDate} on this trip. Add a room that includes this date or pick a different visit date.`,
+      );
+      return false;
+    }
+    if (guests > pool) {
+      setError(
+        `Park ticket guests (${guests}) exceed your room seat pool on ${visitDate} (${pool}). Adjust the ticket or add another room.`,
+      );
+      return false;
+    }
     setParkTicket({ park: selectedPark, visitDate, guests });
+    toast.success(
+      `Added to cart: ${selectedPark.name} · ${visitDate} · ${guests} guest${guests === 1 ? "" : "s"}`,
+    );
     return true;
   };
 
   const handleNext = (): boolean => {
-    if (!formIsTouched && !cart.parkTicket) return true;
+    // Untouched form on a non-last step = "skip this optional step".
+    // When this is the last reachable step (button reads "Add to cart")
+    // we must always commit so the customer gets validation feedback
+    // instead of a silent no-op.
+    if (hasNextStep && !formIsTouched && !cart.parkTicket) return true;
     return commitSelection();
   };
 

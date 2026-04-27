@@ -1,22 +1,9 @@
 "use client";
 
+import { ShoppingBag } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { toast } from "sonner";
 
-import {
-  type SubmitResult,
-  type SubmitStep,
-  useBookingCart,
-} from "@/context/booking-cart-context";
-
-const STEP_LABELS: Record<SubmitStep, string> = {
-  room: "Room",
-  "park-ticket": "Theme park ticket",
-  "park-activity": "Park activity",
-  "beach-activity": "Beach activity",
-  ferry: "Ferry",
-};
+import { useBookingCart } from "@/context/booking-cart-context";
 
 function Line({ label, value }: { label: string; value: string }) {
   return (
@@ -33,10 +20,7 @@ export function BookingSummary() {
     cart,
     canBook,
     hasAnyAddOn,
-    submitting,
-    submitCart,
-    consumeSubmitResult,
-    reset,
+    hasStagedItems,
     existingBookings,
     roomAlreadyExists,
   } = useBookingCart();
@@ -47,40 +31,15 @@ export function BookingSummary() {
     existingBookings.parkActivityBookings.length > 0 ||
     existingBookings.ferryBookings.length > 0;
 
-  const [lastResult, setLastResult] = useState<SubmitResult | null>(null);
+  const stagedCount =
+    cart.rooms.filter((r) => r.existingId === undefined).length +
+    (cart.ferry ? 1 : 0) +
+    (cart.parkTicket ? 1 : 0) +
+    (cart.parkActivity ? 1 : 0) +
+    (cart.beachActivity ? 1 : 0);
 
-  const handleSubmit = async () => {
-    setLastResult(null);
-    const result = await submitCart();
-    setLastResult(result);
-
-    // Reconcile cart with what landed on the API — drops successful
-    // ticket slots, tags posted rooms with existingId, pins the
-    // reservation id. Always run this even on full success: it's a
-    // cheap no-op when reservationId is null, and on success the
-    // reset() below clears state anyway.
-    consumeSubmitResult(result);
-
-    if (result.errors.length === 0 && result.reservationId !== null) {
-      toast.success("Trip booked. Check your dashboard for the details.");
-      reset();
-      router.push("/dashboard");
-      return;
-    }
-
-    // The room bookings are the foundation — if no reservation_id was
-    // resolved, nothing else ran. Otherwise the trip exists and one or
-    // more items reported errors; surface a less-alarming "partial"
-    // toast so the user knows what to fix.
-    if (result.reservationId === null) {
-      toast.error(
-        result.errors[0]?.message ?? "Could not create the room booking.",
-      );
-    } else {
-      toast.warning(
-        `Trip saved, but ${result.errors.length} item(s) need attention.`,
-      );
-    }
+  const handleProceed = () => {
+    router.push("/book/checkout");
   };
 
   return (
@@ -249,61 +208,32 @@ export function BookingSummary() {
         </section>
       ) : null}
 
-      {lastResult && lastResult.errors.length > 0 ? (
-        <div className="border-danger/40 bg-danger/5 space-y-2 rounded-lg border p-3 text-sm">
-          <p className="text-danger font-semibold">
-            {lastResult.reservationId !== null
-              ? "Some items could not be booked:"
-              : "Booking failed:"}
-          </p>
-          <ul className="space-y-1.5">
-            {lastResult.errors.map((err) => {
-              const fieldEntries = Object.entries(err.fieldErrors);
-              return (
-                <li key={`${err.step}-${err.message}`} className="space-y-0.5">
-                  <p className="text-base-color">
-                    <span className="font-medium">
-                      {STEP_LABELS[err.step]}:
-                    </span>{" "}
-                    {err.message}
-                  </p>
-                  {fieldEntries.length > 0 ? (
-                    <ul className="text-muted ml-3 list-disc text-xs">
-                      {fieldEntries.flatMap(([field, msgs]) =>
-                        msgs.map((msg, i) => (
-                          <li key={`${field}-${i}`}>
-                            <span className="font-medium">{field}:</span> {msg}
-                          </li>
-                        )),
-                      )}
-                    </ul>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ) : null}
-
       <div className="border-base border-t pt-4">
         <button
           type="button"
-          className="btn-accent w-full"
-          disabled={!canBook || submitting}
-          onClick={handleSubmit}
+          className="btn-accent inline-flex w-full items-center justify-center gap-2"
+          disabled={!canBook || !hasStagedItems}
+          onClick={handleProceed}
           title={
-            canBook ? undefined : "Confirm a room before sending the booking."
+            canBook ? undefined : "Add a room before proceeding to checkout."
           }
         >
-          {submitting ? "Sending booking…" : "Review & book"}
+          <ShoppingBag className="size-4" aria-hidden />
+          {stagedCount > 0
+            ? `Proceed to checkout · ${stagedCount} item${stagedCount === 1 ? "" : "s"}`
+            : "Proceed to checkout"}
         </button>
         {!canBook ? (
           <p className="text-muted mt-2 text-center text-xs">
-            Book a room to enable checkout.
+            Add a room to enable checkout.
+          </p>
+        ) : !hasAnyAddOn && cart.rooms.every((r) => r.existingId !== undefined) ? (
+          <p className="text-muted mt-2 text-center text-xs">
+            Add at least one item before checking out.
           </p>
         ) : !hasAnyAddOn ? (
           <p className="text-muted mt-2 text-center text-xs">
-            Add-ons are optional — you can book the room by itself.
+            Add-ons are optional — you can check out with the room alone.
           </p>
         ) : null}
       </div>

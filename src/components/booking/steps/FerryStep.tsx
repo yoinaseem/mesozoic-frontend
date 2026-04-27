@@ -1,16 +1,25 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+
 import { StepNav } from "@/components/booking/StepNav";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { useBookingCart } from "@/context/booking-cart-context";
 import { listFerries, listFerrySchedules } from "@/lib/api/ferries";
+import { seatPoolOn } from "@/lib/seat-pool";
 import type { Ferry, FerrySchedule } from "@/types/booking";
 
 export function FerryStep() {
-  const { cart, setFerry, existingBookings, primaryRoom, tripWindow } =
-    useBookingCart();
+  const {
+    cart,
+    setFerry,
+    existingBookings,
+    primaryRoom,
+    tripWindow,
+    hasNextStep,
+  } = useBookingCart();
 
   const [ferries, setFerries] = useState<Ferry[]>([]);
   const [loadingFerries, setLoadingFerries] = useState(true);
@@ -113,6 +122,23 @@ export function FerryStep() {
       setError(`This ferry carries up to ${ferryCapacity} passengers.`);
       return false;
     }
+    // Ferry uses the inclusive seat-pool helper — arrival- and
+    // departure-day crossings are valid (§15).
+    const pool = seatPoolOn(cart.rooms, travelDate, {
+      exclusiveCheckout: false,
+    });
+    if (pool === 0) {
+      setError(
+        `No room covers ${travelDate} on this trip. Add a room that includes this date or pick a different travel date.`,
+      );
+      return false;
+    }
+    if (passengers > pool) {
+      setError(
+        `Ferry passengers (${passengers}) exceed your room seat pool on ${travelDate} (${pool}). Adjust the booking or add another room.`,
+      );
+      return false;
+    }
     if (
       existingBookings.ferryScheduleDates.has(
         `${selectedSchedule.id}|${travelDate}`,
@@ -129,12 +155,18 @@ export function FerryStep() {
       travelDate,
       passengers,
     });
+    toast.success(
+      `Added to cart: ${selectedFerry.name} · ${travelDate} · ${passengers} passenger${passengers === 1 ? "" : "s"}`,
+    );
     return true;
   };
 
-  // Optional step — Next without form interaction just advances.
+  // Optional step — Next without form interaction just advances when
+  // there's a later step. When this is the last reachable step the
+  // button reads "Add to cart" and must always commit (or surface a
+  // validation error) — see BeachActivityStep for the full reasoning.
   const handleNext = (): boolean => {
-    if (!formIsTouched && !cart.ferry) return true;
+    if (hasNextStep && !formIsTouched && !cart.ferry) return true;
     return commitSelection();
   };
 

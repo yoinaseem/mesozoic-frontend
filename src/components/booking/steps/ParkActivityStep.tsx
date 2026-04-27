@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+
 import { StepNav } from "@/components/booking/StepNav";
 import { Input } from "@/components/ui/input";
 import { useBookingCart } from "@/context/booking-cart-context";
@@ -8,11 +10,17 @@ import {
   listParkActivities,
   listParkActivitySchedules,
 } from "@/lib/api/theme-parks";
+import { seatPoolOn } from "@/lib/seat-pool";
 import type { ParkActivity, ParkActivitySchedule } from "@/types/booking";
 
 export function ParkActivityStep() {
-  const { cart, setParkActivity, existingBookings, tripWindow } =
-    useBookingCart();
+  const {
+    cart,
+    setParkActivity,
+    existingBookings,
+    tripWindow,
+    hasNextStep,
+  } = useBookingCart();
   const cartParkTicket = cart.parkTicket;
   // When the user is anchored on an existing reservation that already has
   // a confirmed day-pass, derive the park + visit-date context from it so
@@ -140,6 +148,46 @@ export function ParkActivityStep() {
       return false;
     }
 
+    // Seat pool + day-pass cap (§14). Use whichever date the activity
+    // will run on — schedule.date for the timed flow, the day-pass date
+    // for the all-day flow.
+    const activityDate = isAllDay
+      ? effectiveDate
+      : selectedSchedule?.date ?? effectiveDate;
+    if (activityDate) {
+      const pool = seatPoolOn(cart.rooms, activityDate);
+      if (pool === 0) {
+        setError(
+          `No room covers ${activityDate} on this trip. Add a room that includes this date or pick a different slot.`,
+        );
+        return false;
+      }
+      if (guests > pool) {
+        setError(
+          `Activity guests (${guests}) exceed your room seat pool on ${activityDate} (${pool}). Adjust the booking or add another room.`,
+        );
+        return false;
+      }
+    }
+    if (cartParkTicket && guests > cartParkTicket.guests) {
+      setError(
+        `Activity guests (${guests}) exceed the day-pass guests (${cartParkTicket.guests}). Bump the day-pass first if more people are joining.`,
+      );
+      return false;
+    }
+    const matchingExistingDayPass = existingBookings.parkBookings.find(
+      (b) =>
+        b.park_id === effectiveParkId &&
+        b.date === activityDate &&
+        b.status === "confirmed",
+    );
+    if (matchingExistingDayPass && guests > matchingExistingDayPass.guests) {
+      setError(
+        `Activity guests (${guests}) exceed your existing day-pass guests (${matchingExistingDayPass.guests}) on ${activityDate}.`,
+      );
+      return false;
+    }
+
     if (isAllDay) {
       if (!effectiveDate) {
         setError("Add a park ticket first so we know which date to book.");
@@ -150,6 +198,9 @@ export function ParkActivityStep() {
         date: effectiveDate,
         guests,
       });
+      toast.success(
+        `Added to cart: ${selectedActivity.name} · ${effectiveDate} · ${guests} guest${guests === 1 ? "" : "s"}`,
+      );
       return true;
     }
 
@@ -162,11 +213,18 @@ export function ParkActivityStep() {
       schedule: selectedSchedule,
       guests,
     });
+    toast.success(
+      `Added to cart: ${selectedActivity.name} · ${selectedSchedule.date} ${selectedSchedule.start_time} · ${guests} guest${guests === 1 ? "" : "s"}`,
+    );
     return true;
   };
 
   const handleNext = (): boolean => {
-    if (!formIsTouched && !cart.parkActivity) return true;
+    // Untouched form on a non-last step = "skip this optional step".
+    // When this is the last reachable step (button reads "Add to cart")
+    // we must always commit so the customer gets validation feedback
+    // instead of a silent no-op.
+    if (hasNextStep && !formIsTouched && !cart.parkActivity) return true;
     return commitSelection();
   };
 

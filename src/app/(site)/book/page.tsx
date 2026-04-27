@@ -5,6 +5,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AttachReservationDialog } from "@/components/booking/AttachReservationDialog";
 import { BookingStepper } from "@/components/booking/BookingStepper";
 import { BookingSummary } from "@/components/booking/BookingSummary";
+import { CartStatusBanner } from "@/components/booking/CartStatusBanner";
 import { LockedNotice } from "@/components/booking/LockedNotice";
 import { UpcomingTripSelector } from "@/components/booking/UpcomingTripSelector";
 import { BeachActivityStep } from "@/components/booking/steps/BeachActivityStep";
@@ -65,6 +66,7 @@ function BookingPageInner() {
     attachToReservationId,
     roomAlreadyExists,
     startFromExistingReservation,
+    hasStagedItems,
     activeStep,
     setActiveStep,
   } = useBookingCart();
@@ -129,8 +131,14 @@ function BookingPageInner() {
     };
   }, [tripWindow, roomAlreadyExists, setAttachToReservationId]);
 
+  // Only show "Continue an upcoming trip" when the cart is genuinely
+  // empty — single-draft semantics. With staged items, the customer has
+  // an in-progress draft they should resume (or explicitly discard from
+  // the dashboard) before anchoring on an existing trip.
   const showSelector =
-    cart.rooms.length === 0 && upcomingReservations.length > 0;
+    !hasStagedItems &&
+    cart.rooms.length === 0 &&
+    upcomingReservations.length > 0;
 
   return (
     <div className="bg-base min-h-screen pt-24 pb-12">
@@ -159,6 +167,8 @@ function BookingPageInner() {
             </p>
           ) : null}
         </header>
+
+        <CartStatusBanner />
 
         {showSelector ? (
           <UpcomingTripSelector

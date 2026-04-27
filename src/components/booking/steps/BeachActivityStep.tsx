@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+
 import { StepNav } from "@/components/booking/StepNav";
 import { Input } from "@/components/ui/input";
 import { useBookingCart } from "@/context/booking-cart-context";
@@ -8,11 +10,18 @@ import {
   listBeachActivities,
   listBeachActivitySchedules,
 } from "@/lib/api/beach-activities";
+import { seatPoolOn } from "@/lib/seat-pool";
 import type { BeachActivity, BeachActivitySchedule } from "@/types/booking";
 
 export function BeachActivityStep() {
-  const { cart, setBeachActivity, existingBookings, primaryRoom, tripWindow } =
-    useBookingCart();
+  const {
+    cart,
+    setBeachActivity,
+    existingBookings,
+    primaryRoom,
+    tripWindow,
+    hasNextStep,
+  } = useBookingCart();
 
   const [activities, setActivities] = useState<BeachActivity[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(true);
@@ -104,16 +113,38 @@ export function BeachActivityStep() {
       );
       return false;
     }
+    // Reservation seat pool — beach uses exclusive checkout (§13).
+    const pool = seatPoolOn(cart.rooms, selectedSchedule.activity_date);
+    if (pool === 0) {
+      setError(
+        `No room covers ${selectedSchedule.activity_date} on this trip. Add a room that includes this date or pick a different session.`,
+      );
+      return false;
+    }
+    if (guests > pool) {
+      setError(
+        `Beach activity guests (${guests}) exceed your room seat pool on ${selectedSchedule.activity_date} (${pool}). Adjust the booking or add another room.`,
+      );
+      return false;
+    }
     setBeachActivity({
       activity: selectedActivity,
       schedule: selectedSchedule,
       guests,
     });
+    toast.success(
+      `Added to cart: ${selectedActivity.name} · ${selectedSchedule.activity_date} · ${guests} guest${guests === 1 ? "" : "s"}`,
+    );
     return true;
   };
 
   const handleNext = (): boolean => {
-    if (!formIsTouched && !cart.beachActivity) return true;
+    // When there's a later step to walk to, an untouched form means
+    // "skip this optional step" → just navigate. When this is the last
+    // reachable step the button reads "Add to cart" and must always
+    // commit (or surface a validation error) — silent no-op would leave
+    // the customer wondering why nothing happened.
+    if (hasNextStep && !formIsTouched && !cart.beachActivity) return true;
     return commitSelection();
   };
 

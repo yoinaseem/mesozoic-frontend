@@ -39,6 +39,14 @@ export function StepNav({ onNext, onPrevious, leadingActions }: Props) {
     goToPreviousStep();
   };
 
+  // When there's no later step to navigate to (last step in the flow,
+  // or every later step is locked) the button still needs to commit the
+  // form — that's the customer's only "Add to cart" affordance for steps
+  // that don't surface a separate add button (i.e. every step except
+  // RoomStep). Relabel for clarity; goToNextStep() is a no-op in that
+  // case so the customer stays on the page after commit.
+  const nextLabel = hasNextStep ? "Next" : "Add to cart";
+
   return (
     <div className="border-base flex flex-wrap items-center justify-between gap-3 border-t pt-4">
       <div className="flex flex-wrap items-center gap-3">{leadingActions}</div>
@@ -51,13 +59,8 @@ export function StepNav({ onNext, onPrevious, leadingActions }: Props) {
         >
           Previous
         </button>
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={handleNext}
-          disabled={!hasNextStep}
-        >
-          Next
+        <button type="button" className="btn-primary" onClick={handleNext}>
+          {nextLabel}
         </button>
       </div>
     </div>

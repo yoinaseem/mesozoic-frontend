@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { StepNav } from "@/components/booking/StepNav";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -191,6 +192,20 @@ export function RoomStep() {
       !checkOut
     )
       return false;
+
+    // Soft-warn (don't block) when the new room exactly matches one
+    // already in the cart — two rooms of the same type for the same
+    // dates is legitimate (parents + kids), but it's also a common
+    // accidental double-click. Notify but allow.
+    const duplicate = cart.rooms.some(
+      (r) =>
+        r.existingId === undefined &&
+        r.hotel.id === selectedHotel.id &&
+        r.roomType.id === selectedRoomType.id &&
+        r.checkIn === checkIn &&
+        r.checkOut === checkOut,
+    );
+
     addRoom({
       hotel: selectedHotel,
       roomType: selectedRoomType,
@@ -198,6 +213,15 @@ export function RoomStep() {
       checkOut,
       guests,
     });
+    if (duplicate) {
+      toast.warning(
+        `Heads up: you already have a ${selectedRoomType.name} at ${selectedHotel.name} for these dates in your cart. Both will be booked unless you remove one.`,
+      );
+    } else {
+      toast.success(
+        `Added to cart: ${selectedHotel.name} · ${selectedRoomType.name} · ${checkIn} → ${checkOut}`,
+      );
+    }
     return true;
   };
 

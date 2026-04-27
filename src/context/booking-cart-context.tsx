@@ -12,6 +12,13 @@ import {
   ApiError,
   getValidationErrors,
 } from "@/lib/api-client";
+import { useAuth } from "@/context/auth-context";
+import {
+  clearCart as clearCartStorage,
+  hasStagedItems as hasStagedItemsHelper,
+  loadCart,
+  saveCart,
+} from "@/lib/cart-storage";
 import {
   createBeachBooking,
   listBeachBookings,
@@ -153,6 +160,15 @@ type BookingCartContextValue = {
   // ticket slots clear, attachToReservationId pins to the new trip, and
   // existingBookings refetches so duplicate-pre-checks see the new items.
   consumeSubmitResult: (result: SubmitResult) => void;
+  // True when the cart has anything the customer would care about saving
+  // — staged tickets or freshly-added (non-existing) rooms. Drives the
+  // "Proceed to checkout" CTA visibility and the dashboard widget.
+  hasStagedItems: boolean;
+  // True once the storage hydration effect has completed for the current
+  // user. Pages downstream (e.g. /book/checkout's empty-cart redirect)
+  // should wait for this before reading hasStagedItems — otherwise they
+  // race the load and bounce the customer with a still-empty cart.
+  isHydrated: boolean;
   // Active step + nav helpers — lifted into context so each step can
   // render its own Previous/Next buttons without prop-drilling.
   activeStep: BookingStep;
@@ -205,6 +221,9 @@ export function BookingCartProvider({
 }: {
   children: React.ReactNode;
 }) {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
+
   const [cart, setCart] = useState<BookingCart>(EMPTY_CART);
   const [reservationId, setReservationId] = useState<number | null>(null);
   const [attachToReservationId, setAttachToReservationId] = useState<
@@ -214,12 +233,57 @@ export function BookingCartProvider({
   const [roomAlreadyExists, setRoomAlreadyExists] = useState(false);
   const [existingBookings, setExistingBookings] =
     useState<ExistingReservationBookings>(EMPTY_EXISTING);
+  // Only persist after the initial hydration completes — otherwise the
+  // first render would overwrite the saved cart with EMPTY_CART before
+  // we have a chance to load it. State (not ref) so the load + flip
+  // commit together: the persistence effect won't see isHydrated=true
+  // while cart is still EMPTY_CART, which is what the previous ref-based
+  // version raced on.
+  const [isHydrated, setIsHydrated] = useState(false);
   // Bumping this forces the existingBookings useEffect to re-run even
   // when attachToReservationId hasn't changed — used after a successful
   // submit so the just-confirmed items show up in conflict pre-checks.
   const [existingBookingsRefreshKey, setExistingBookingsRefreshKey] =
     useState(0);
   const [activeStep, setActiveStep] = useState<BookingStep>("room");
+
+  // Hydrate from storage when the user resolves. Re-runs when the user
+  // changes (logout/login as a different account).
+  useEffect(() => {
+    if (userId === null) {
+      setIsHydrated(false);
+      return;
+    }
+    const stored = loadCart(userId);
+    if (stored) {
+      setCart(stored.cart);
+      setAttachToReservationId(stored.attachToReservationId);
+      setRoomAlreadyExists(stored.roomAlreadyExists);
+      setActiveStep(stored.activeStep);
+    }
+    setIsHydrated(true);
+  }, [userId]);
+
+  // Persist on every cart-relevant state change. Skipped until the
+  // hydration effect's state updates have landed (isHydrated flipped
+  // *and* cart/etc. populated in the same commit) so we don't blow away
+  // saved state on first render.
+  useEffect(() => {
+    if (userId === null || !isHydrated) return;
+    saveCart(userId, {
+      cart,
+      attachToReservationId,
+      roomAlreadyExists,
+      activeStep,
+    });
+  }, [
+    userId,
+    isHydrated,
+    cart,
+    attachToReservationId,
+    roomAlreadyExists,
+    activeStep,
+  ]);
 
   // Whenever the customer chooses to attach to an existing reservation,
   // fetch its current confirmed tickets so step pickers can grey out
@@ -336,7 +400,8 @@ export function BookingCartProvider({
     setAttachToReservationId(null);
     setRoomAlreadyExists(false);
     setActiveStep("room");
-  }, []);
+    if (userId !== null) clearCartStorage(userId);
+  }, [userId]);
 
   const consumeSubmitResult = useCallback((result: SubmitResult) => {
     if (result.reservationId === null) return;
@@ -455,6 +520,13 @@ export function BookingCartProvider({
     cart.parkTicket !== null ||
     cart.parkActivity !== null ||
     cart.beachActivity !== null;
+
+  const hasStagedItems = hasStagedItemsHelper({
+    cart,
+    attachToReservationId,
+    roomAlreadyExists,
+    activeStep,
+  });
 
   const canBook = hasRoom;
 
@@ -706,6 +778,8 @@ export function BookingCartProvider({
       submitCart,
       existingBookings,
       consumeSubmitResult,
+      hasStagedItems,
+      isHydrated,
       activeStep,
       setActiveStep,
       goToNextStep,
@@ -737,6 +811,8 @@ export function BookingCartProvider({
       submitCart,
       existingBookings,
       consumeSubmitResult,
+      hasStagedItems,
+      isHydrated,
       activeStep,
       goToNextStep,
       goToPreviousStep,

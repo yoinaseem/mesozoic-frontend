@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { ContactStaffNote } from "@/components/dashboard/ContactStaffNote";
+import { InProgressBookingCard } from "@/components/dashboard/InProgressBookingCard";
 import { StatTile } from "@/components/dashboard/StatTile";
 import { TripList } from "@/components/dashboard/TripList";
 import { UpcomingBookingsList } from "@/components/dashboard/UpcomingBookingsList";
@@ -138,6 +139,8 @@ export function CustomerDashboard() {
             </div>
           ) : snapshot && aggregates ? (
             <div className="space-y-6">
+              <InProgressBookingCard />
+
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <StatTile
                   label="Upcoming trips"
