@@ -1,15 +1,17 @@
 "use client";
 
-import { Bed, CalendarRange, Wallet } from "lucide-react";
+import { Bed, CalendarRange, DoorOpen, Wallet } from "lucide-react";
 
 import { SpendOverTimeChart } from "@/components/dashboard/SpendOverTimeChart";
 import { StatTile } from "@/components/dashboard/StatTile";
 import { HotelStatCard } from "@/components/admin-dashboard/HotelStatCard";
 import { RecentActivityFeed } from "@/components/admin-dashboard/RecentActivityFeed";
+import { RoomTypeMixChart } from "@/components/admin-dashboard/RoomTypeMixChart";
 import {
   deriveHotelStats,
   deriveRecentActivity,
   deriveRevenueByMonth,
+  deriveRoomTypeMix,
   formatMoney,
   type AdminSnapshot,
 } from "@/lib/admin-dashboard";
@@ -21,9 +23,21 @@ type Props = {
 export function HotelManagerView({ snapshot }: Props) {
   const stats = deriveHotelStats(snapshot);
   const revenueByMonth = deriveRevenueByMonth(snapshot);
+  const roomTypeMix = deriveRoomTypeMix(snapshot);
   const recentActivity = deriveRecentActivity(snapshot, 10).filter(
     (i) => i.type === "room",
   );
+
+  // For hotel-managers, scope the "all room types" stat to their assigned
+  // hotels. Superadmins on this tab see every published room type.
+  const inScopeHotelIds =
+    snapshot.role === "hotel-manager"
+      ? new Set(snapshot.myHotels.map((h) => h.id))
+      : new Set(snapshot.hotels.map((h) => h.id));
+  const roomTypesCount = snapshot.hotels.reduce((acc, h) => {
+    if (!inScopeHotelIds.has(h.id)) return acc;
+    return acc + (h.room_types?.length ?? 0);
+  }, 0);
 
   const totalCheckInsToday = stats.reduce(
     (acc, s) => acc + s.checkInsToday.length,
@@ -59,6 +73,12 @@ export function HotelManagerView({ snapshot }: Props) {
           icon={CalendarRange}
         />
         <StatTile
+          label="Room types"
+          value={String(roomTypesCount)}
+          hint="Published across managed hotels"
+          icon={DoorOpen}
+        />
+        <StatTile
           label="Revenue (12 mo)"
           value={formatMoney(totalRevenue)}
           hint="Across managed hotels"
@@ -81,6 +101,8 @@ export function HotelManagerView({ snapshot }: Props) {
           ))}
         </div>
       )}
+
+      <RoomTypeMixChart data={roomTypeMix} />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <SpendOverTimeChart data={revenueByMonth} />

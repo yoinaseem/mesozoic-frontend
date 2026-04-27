@@ -445,6 +445,50 @@ export function deriveBookingMix(snapshot: AdminSnapshot): MixSlice[] {
   ];
 }
 
+// Confirmed room-bookings grouped by room type. Used by the donut chart in
+// the hotel-manager view to surface which room types are pulling weight.
+// Hotel-managers automatically scope to their assigned hotels via myHotels;
+// superadmins see every hotel's room types.
+export type RoomTypeMixEntry = {
+  roomTypeId: number;
+  name: string;
+  hotelName: string;
+  count: number;
+  revenue: number;
+};
+
+export function deriveRoomTypeMix(
+  snapshot: AdminSnapshot,
+): RoomTypeMixEntry[] {
+  // Same scope rule as deriveHotelStats: hotel-manager → only myHotels.
+  const allowedHotelIds =
+    snapshot.role === "hotel-manager"
+      ? new Set(snapshot.myHotels.map((h) => h.id))
+      : new Set(snapshot.hotels.map((h) => h.id));
+
+  const hotelNameById = new Map<number, string>();
+  for (const h of snapshot.hotels) hotelNameById.set(h.id, h.name);
+  for (const h of snapshot.myHotels) {
+    if (!hotelNameById.has(h.id)) hotelNameById.set(h.id, h.name);
+  }
+
+  const entries = new Map<number, RoomTypeMixEntry>();
+  for (const rb of snapshot.roomBookings) {
+    if (rb.status !== "confirmed") continue;
+    if (allowedHotelIds.size > 0 && !allowedHotelIds.has(rb.hotel_id)) continue;
+    const id = rb.room_type_id;
+    const name = rb.room_type?.name ?? `Room type #${id}`;
+    const hotelName =
+      rb.hotel?.name ?? hotelNameById.get(rb.hotel_id) ?? `Hotel #${rb.hotel_id}`;
+    const cur =
+      entries.get(id) ?? { roomTypeId: id, name, hotelName, count: 0, revenue: 0 };
+    cur.count += 1;
+    cur.revenue += Number(rb.total_price);
+    entries.set(id, cur);
+  }
+  return Array.from(entries.values()).sort((a, b) => b.count - a.count);
+}
+
 // Top 5 hotels by confirmed-room revenue.
 export type TopHotelEntry = { hotelId: number; name: string; revenue: number };
 

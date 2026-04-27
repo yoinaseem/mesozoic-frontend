@@ -4,6 +4,7 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  Label,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -36,11 +37,11 @@ export function SignupsOverTimeChart({ data }: Props) {
           No new customers in the last 12 months.
         </p>
       ) : (
-        <div className="h-48">
+        <div className="h-60">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
               data={data}
-              margin={{ top: 8, right: 4, left: 0, bottom: 0 }}
+              margin={{ top: 8, right: 12, left: 12, bottom: 24 }}
             >
               <defs>
                 <linearGradient id="signupGradient" x1="0" y1="0" x2="0" y2="1">
@@ -55,17 +56,41 @@ export function SignupsOverTimeChart({ data }: Props) {
               />
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 11, fill: "var(--color-muted)" }}
+                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                 tickLine={false}
                 axisLine={false}
-              />
+              >
+                <Label
+                  value="Month"
+                  position="insideBottom"
+                  offset={-12}
+                  style={{
+                    fontSize: 12,
+                    fill: "var(--foreground)",
+                    fontWeight: 600,
+                  }}
+                />
+              </XAxis>
               <YAxis
                 allowDecimals={false}
-                tick={{ fontSize: 11, fill: "var(--color-muted)" }}
+                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                 tickLine={false}
                 axisLine={false}
-                width={28}
-              />
+                width={48}
+              >
+                <Label
+                  value="New customers"
+                  angle={-90}
+                  position="insideLeft"
+                  offset={10}
+                  style={{
+                    fontSize: 12,
+                    fill: "var(--foreground)",
+                    fontWeight: 600,
+                    textAnchor: "middle",
+                  }}
+                />
+              </YAxis>
               <Tooltip
                 contentStyle={{
                   backgroundColor: "var(--color-surface)",

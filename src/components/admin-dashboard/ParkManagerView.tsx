@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarHeart, TicketCheck } from "lucide-react";
+import { CalendarHeart, CalendarClock, TreePalm, TicketCheck } from "lucide-react";
 
 import { StatTile } from "@/components/dashboard/StatTile";
 import { ClosuresWidget } from "@/components/admin-dashboard/ClosuresWidget";
@@ -48,6 +48,23 @@ export function ParkManagerView({ snapshot }: Props) {
     (i) => i.type === "park" || i.type === "activity",
   );
 
+  // Catalogue counts surface "what's published" alongside the operational
+  // tiles so a park-manager has a single-glance view of inventory + demand.
+  const totalParks = snapshot.themeParks.length;
+  const totalActivities = snapshot.themeParks.reduce(
+    (acc, p) => acc + (p.activities?.length ?? 0),
+    0,
+  );
+  const totalActivitySchedules = snapshot.themeParks.reduce((acc, p) => {
+    return (
+      acc +
+      (p.activities?.reduce(
+        (a, act) => a + (act.schedules_count ?? act.schedules?.length ?? 0),
+        0,
+      ) ?? 0)
+    );
+  }, 0);
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -64,6 +81,18 @@ export function ParkManagerView({ snapshot }: Props) {
           hint="Confirmed activity bookings"
           icon={CalendarHeart}
           accent="primary"
+        />
+        <StatTile
+          label="Parks"
+          value={String(totalParks)}
+          hint="Live theme parks"
+          icon={TreePalm}
+        />
+        <StatTile
+          label="Activities"
+          value={String(totalActivities)}
+          hint={`${totalActivitySchedules} scheduled slot${totalActivitySchedules === 1 ? "" : "s"}`}
+          icon={CalendarClock}
         />
         <StatTile
           label="Upcoming closures"
