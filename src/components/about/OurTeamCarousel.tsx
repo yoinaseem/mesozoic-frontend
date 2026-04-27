@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -8,49 +9,51 @@ type TeamMember = {
   role: string;
   bio: string;
   initials: string;
+  avatarSrc?: string;
 };
 
 const TEAM: TeamMember[] = [
   {
-    name: "Ayesha Khan",
+    name: "Yaeesh Naseem",
     role: "Founder & CEO",
     bio: "Steers the island vision and keeps every guest stay rooted in warm, grounded hospitality.",
-    initials: "AK",
+    initials: "YN",
+    avatarSrc: "/img/team-yaeesh-naseem.png",
   },
   {
-    name: "Marco Reyes",
+    name: "Ahmed Maaiz",
     role: "Head of Experiences",
     bio: "Curates attractions and activities — from guided dives to forest walks to sunset safaris.",
-    initials: "MR",
+    initials: "AM",
+    avatarSrc: "/img/team-ahmed-maaiz.png",
   },
   {
-    name: "Liu Chen",
+    name: "Sulaiman Zahwan",
     role: "Hospitality Director",
     bio: "Trains resort teams so every check-in and farewell feels like a welcome home.",
-    initials: "LC",
+    initials: "SZ",
+    avatarSrc: "/img/team-sulaiman-zahwan.png",
   },
   {
-    name: "Priya Sharma",
+    name: "Anoof Ibrahim",
     role: "Guest Experience Lead",
     bio: "Handles every request end-to-end, often before guests even think to ask.",
-    initials: "PS",
+    initials: "AI",
+    avatarSrc: "/img/team-anoof-ibrahim.png",
   },
   {
-    name: "Tomás Oliveira",
+    name: "Mohamed Nawish",
     role: "Adventure Operations",
     bio: "Keeps every trail, dive, and reef safari running smooth, safe, and on time.",
-    initials: "TO",
-  },
-  {
-    name: "Nadia Haruto",
-    role: "Design & Brand",
-    bio: "Shapes how the island looks, feels, and reads — from signage to the smallest detail.",
-    initials: "NH",
-  },
+    initials: "MN",
+    avatarSrc: "/img/team-mohamed-nawish.png",
+  }
+  
 ];
 
 const TEAM_LEN = TEAM.length;
-const RENDERED = [...TEAM, ...TEAM, ...TEAM];
+const RENDERED = [...TEAM, ...TEAM, ...TEAM, ...TEAM, ...TEAM];
+const MIDDLE_CYCLE_INDEX = 2;
 
 function getCardStep(scroller: HTMLElement): number {
   const card = scroller.querySelector<HTMLElement>("[data-team-card]");
@@ -62,16 +65,29 @@ function getCardStep(scroller: HTMLElement): number {
 
 export function OurTeamCarousel() {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const isProgrammaticScrollRef = useRef(false);
+  const programmaticTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const normalizeToMiddleCycle = useCallback((el: HTMLElement, step: number) => {
+    if (step <= 0) return;
+    const cycleWidth = step * TEAM_LEN;
+    const middleStart = cycleWidth * MIDDLE_CYCLE_INDEX;
+    const middleEnd = cycleWidth * (MIDDLE_CYCLE_INDEX + 1);
+
+    if (el.scrollLeft >= middleEnd || el.scrollLeft < middleStart) {
+      const offsetInCycle =
+        ((el.scrollLeft - middleStart) % cycleWidth + cycleWidth) % cycleWidth;
+      el.scrollLeft = middleStart + offsetInCycle;
+    }
+  }, []);
 
   const recenter = useCallback(() => {
     const el = scrollerRef.current;
     if (!el) return;
     const step = getCardStep(el);
     if (step === 0) return;
-    const cycleWidth = step * TEAM_LEN;
-    const offsetInCycle = el.scrollLeft % cycleWidth;
-    el.scrollLeft = cycleWidth + offsetInCycle;
-  }, []);
+    normalizeToMiddleCycle(el, step);
+  }, [normalizeToMiddleCycle]);
 
   useEffect(() => {
     const el = scrollerRef.current;
@@ -89,15 +105,12 @@ export function OurTeamCarousel() {
     if (!el) return;
     let settleTimer: ReturnType<typeof setTimeout> | null = null;
     const onScroll = () => {
+      if (isProgrammaticScrollRef.current) return;
       if (settleTimer) clearTimeout(settleTimer);
       settleTimer = setTimeout(() => {
         const step = getCardStep(el);
         if (step === 0) return;
-        const cycleWidth = step * TEAM_LEN;
-        const middleStart = cycleWidth;
-        const middleEnd = cycleWidth * 2;
-        while (el.scrollLeft >= middleEnd) el.scrollLeft -= cycleWidth;
-        while (el.scrollLeft < middleStart) el.scrollLeft += cycleWidth;
+        normalizeToMiddleCycle(el, step);
       }, 140);
     };
     el.addEventListener("scroll", onScroll, { passive: true });
@@ -105,18 +118,49 @@ export function OurTeamCarousel() {
       el.removeEventListener("scroll", onScroll);
       if (settleTimer) clearTimeout(settleTimer);
     };
-  }, []);
+  }, [normalizeToMiddleCycle]);
 
   const cycle = (dir: "prev" | "next") => {
     const el = scrollerRef.current;
     if (!el) return;
     const step = getCardStep(el);
     if (step === 0) return;
-    el.scrollBy({
-      left: dir === "next" ? step : -step,
-      behavior: "smooth",
-    });
+
+    const cycleWidth = step * TEAM_LEN;
+    const middleStart = cycleWidth * MIDDLE_CYCLE_INDEX;
+    const middleEnd = cycleWidth * (MIDDLE_CYCLE_INDEX + 1);
+
+    isProgrammaticScrollRef.current = true;
+    if (programmaticTimerRef.current) clearTimeout(programmaticTimerRef.current);
+    const delta = dir === "next" ? step : -step;
+
+    // When crossing the seam, jump first (no animation) then start smooth scroll
+    // on the next frame. This removes the micro-stutter on card 5 -> 1.
+    if (dir === "next" && el.scrollLeft + step >= middleEnd) {
+      el.scrollLeft -= cycleWidth;
+      requestAnimationFrame(() => {
+        el.scrollBy({ left: delta, behavior: "smooth" });
+      });
+    } else if (dir === "prev" && el.scrollLeft - step < middleStart) {
+      el.scrollLeft += cycleWidth;
+      requestAnimationFrame(() => {
+        el.scrollBy({ left: delta, behavior: "smooth" });
+      });
+    } else {
+      el.scrollBy({ left: delta, behavior: "smooth" });
+    }
+
+    programmaticTimerRef.current = setTimeout(() => {
+      isProgrammaticScrollRef.current = false;
+      normalizeToMiddleCycle(el, step);
+    }, 420);
   };
+
+  useEffect(() => {
+    return () => {
+      if (programmaticTimerRef.current) clearTimeout(programmaticTimerRef.current);
+    };
+  }, []);
 
   return (
     <div className="relative">
@@ -128,7 +172,7 @@ export function OurTeamCarousel() {
           <article
             key={`${member.name}-${i}`}
             data-team-card
-            className="group/depth bg-surface border-base relative flex w-[85%] shrink-0 snap-start flex-col overflow-hidden rounded-3xl border p-8 shadow-md transition-all duration-500 hover:shadow-lg motion-reduce:transition-none perspective-distant md:w-[calc((100%-3rem)/3)]"
+            className="group/depth bg-surface border-base dark:bg-black dark:border-black relative flex w-[85%] shrink-0 snap-start flex-col overflow-hidden rounded-3xl border p-8 shadow-md transition-all duration-500 hover:shadow-lg motion-reduce:transition-none perspective-distant md:w-[calc((100%-3rem)/3)]"
           >
             <div
               className="pointer-events-none absolute inset-0 bg-linear-to-b from-white/20 to-transparent dark:from-black/20 dark:to-black/8"
@@ -143,18 +187,28 @@ export function OurTeamCarousel() {
             >
               <div
                 aria-hidden
-                className="bg-primary/10 text-primary flex h-20 w-20 items-center justify-center rounded-full text-2xl font-semibold"
+                className="bg-primary/10 text-primary relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-full text-2xl font-semibold ring-2 ring-black/85 dark:ring-white/85"
               >
-                {member.initials}
+                {member.avatarSrc ? (
+                  <Image
+                    src={member.avatarSrc}
+                    alt={`${member.name} profile`}
+                    fill
+                    sizes="80px"
+                    className="object-cover"
+                  />
+                ) : (
+                  member.initials
+                )}
               </div>
-              <p className="text-base-color mt-6 flex-1 text-base leading-relaxed">
+              <p className="text-base-color mt-6 flex-1 text-base leading-relaxed font-semibold">
                 {member.bio}
               </p>
               <div className="border-base mt-6 border-t pt-5">
-                <p className="font-heading text-primary text-lg font-semibold">
+                <p className="font-heading text-primary text-lg font-bold">
                   {member.name}
                 </p>
-                <p className="text-primary text-sm font-bold">
+                <p className="text-primary text-sm font-extrabold">
                   {member.role}
                 </p>
               </div>

@@ -31,7 +31,7 @@ export function WelcomeStrip({
   ];
 
   return (
-    <section className="bg-base border-base border-t py-20 md:py-24">
+    <section className="bg-base bg-linear-to-b from-primary/10 to-transparent dark:from-transparent border-base border-t py-20 md:py-24">
       <div className="mx-auto max-w-5xl px-6">
         <div className="bg-primary grid grid-cols-2 overflow-hidden rounded-2xl shadow-xl md:grid-cols-4">
           {stats.map(({ icon: Icon, value, label }) => (

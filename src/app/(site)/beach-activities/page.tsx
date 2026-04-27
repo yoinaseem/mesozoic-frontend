@@ -16,7 +16,7 @@ export default async function BeachActivitiesPage() {
 
   return (
     <div className="bg-base min-h-screen pt-18">
-      <section className="pt-16 pb-4 bg-linear-to-b from-primary/10 to-transparent">
+      <section className="pt-16 pb-4 bg-linear-to-b from-primary/10 to-transparent dark:from-transparent">
         <div className="max-w-7xl mx-auto px-6">
           <header className="mb-8">
             <h1 className="text-5xl font-bold text-primary mb-4">

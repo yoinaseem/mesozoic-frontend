@@ -86,20 +86,20 @@ export default function Navbar() {
 
   const linkClass = transparentOnHero
     ? `${linkBase} text-white!  font-normal drop-shadow-md`
-    : `${linkBase} text-primary font-bold`;
+    : `${linkBase} text-primary dark:text-white font-semibold dark:font-normal`;
   const toggleClass = transparentOnHero
     ? "text-white! drop-shadow-md hover:bg-white/10"
-    : "text-primary hover:bg-base/70";
+    : "text-primary hover:bg-base/70 dark:text-white dark:hover:bg-white/10";
   const brandTextClass = transparentOnHero
     ? "text-white! drop-shadow-md"
-    : "text-primary";
+    : "text-primary dark:text-white";
 
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-30 w-full transition-[background-color,border-color] duration-300 ${
         transparentOnHero
           ? "border-b border-transparent bg-transparent"
-          : "border-b-2 border-base bg-surface"
+          : "border-b-2 border-base bg-surface dark:border-black dark:bg-black"
       }`}
     >
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>

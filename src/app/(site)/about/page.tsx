@@ -22,7 +22,7 @@ export default function AboutPage() {
   return (
     <div className="bg-base min-h-full">
       <section
-        className="relative -mt-16 overflow-hidden bg-base pb-7 pt-22 md:pb-8 md:pt-26"
+        className="relative -mt-16 overflow-hidden bg-base bg-linear-to-b from-primary/10 to-transparent dark:from-transparent pb-7 pt-22 md:pb-8 md:pt-26"
         aria-label="About us hero"
       >
         <div
@@ -36,7 +36,7 @@ export default function AboutPage() {
 
         <div className="relative mx-auto flex min-h-[34dvh] w-full max-w-7xl items-center px-6 md:min-h-[38dvh]">
           <div className="mx-auto max-w-4xl text-center">
-            <p className="font-heading text-accent text-xs font-semibold uppercase tracking-[0.42em] sm:text-sm">
+            <p className="font-heading text-black dark:text-[#fbbf24] text-xs font-semibold uppercase tracking-[0.42em] sm:text-sm">
               ABOUT US
             </p>
 
@@ -49,7 +49,7 @@ export default function AboutPage() {
                   className="h-px w-12 bg-accent opacity-90 sm:w-16"
                   aria-hidden
                 />
-                <span className="font-heading text-accent text-sm font-semibold tracking-[0.34em] sm:text-base">
+                <span className="font-heading text-black dark:text-[#fbbf24] text-sm font-semibold tracking-[0.34em] sm:text-base">
                   AN ISLAND STORY
                 </span>
                 <span
@@ -71,7 +71,7 @@ export default function AboutPage() {
             <div className="group/story relative aspect-4/3 w-full overflow-hidden rounded-3xl border border-white/20 shadow-md lg:aspect-5/6">
               <Image
                 // UPDATE
-                src="/img/banner.avif"
+                src="/img/about-our-story.png"
                 alt="Island Arrival"
                 fill
                 sizes="(min-width: 1024px) 32vw, 100vw"
@@ -154,7 +154,7 @@ export default function AboutPage() {
             <div className="absolute inset-0 overflow-hidden rounded-2xl shadow-xl ring-1 ring-black/5">
               <Image
                 // UPDATE
-                src="/img/banner.avif"
+                src="/img/about-vision-mission.png"
                 alt="A panoramic glimpse of Mesozoic Isle"
                 fill
                 className="object-cover transition-transform duration-700 ease-out will-change-transform transform-[scale(1.06)_rotateX(0deg)_rotateY(0deg)] group-hover/depth:transform-[scale(1.14)_rotateX(1.2deg)_rotateY(2.5deg)] group-active/depth:transform-[scale(1.14)_rotateX(1.2deg)_rotateY(2.5deg)] motion-reduce:transition-none motion-reduce:transform-none"
@@ -229,7 +229,7 @@ export default function AboutPage() {
             {VALUES.map(({ title, description, icon: Icon }) => (
               <li
                 key={title}
-                className="group/value bg-surface border-base flex flex-col gap-5 border px-7 py-9 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:-translate-y-1 active:shadow-lg motion-reduce:transition-none motion-reduce:transform-none md:px-8 md:py-10"
+                className="group/value bg-surface border-base dark:bg-black dark:border-black dark:text-white flex flex-col gap-5 border px-7 py-9 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:-translate-y-1 active:shadow-lg motion-reduce:transition-none motion-reduce:transform-none md:px-8 md:py-10"
               >
                 <span
                   aria-hidden

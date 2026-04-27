@@ -40,7 +40,7 @@ export function WhyMesozoic() {
           {PILLARS.map(({ icon: Icon, title, body }) => (
             <li
               key={title}
-              className="border-base bg-surface rounded-2xl border p-8 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
+              className="border-base bg-surface dark:bg-black dark:border-black rounded-2xl border p-8 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
             >
               <div className="bg-primary/10 inline-flex size-12 items-center justify-center rounded-xl">
                 <Icon className="text-primary size-6" aria-hidden />

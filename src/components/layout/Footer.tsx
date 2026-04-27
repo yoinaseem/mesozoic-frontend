@@ -67,7 +67,7 @@ const socialLinks: Array<{
 ];
 
 const linkBaseClass =
-  "inline-flex rounded-sm text-sm text-base-color transition-colors hover:text-primary focus-visible:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  "inline-flex rounded-sm text-sm text-base-color transition-colors hover:text-primary focus-visible:text-primary dark:text-white/80 dark:hover:text-white dark:focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 function FooterLink({ link }: { link: FooterLinkItem }) {
   if (link.external) {
@@ -98,7 +98,7 @@ function LinkColumn({
 }) {
   return (
     <div>
-      <h3 className="text-primary text-sm font-semibold tracking-[0.18em] uppercase">
+      <h3 className="text-primary dark:text-white text-sm font-semibold tracking-[0.18em] uppercase">
         {heading}
       </h3>
       <ul className="mt-5 flex flex-col gap-3">
@@ -114,7 +114,7 @@ function LinkColumn({
 
 export default function Footer() {
   return (
-    <footer className="bg-surface border-base mt-auto shrink-0 border-t">
+    <footer className="bg-surface border-base dark:bg-black dark:text-white dark:border-black mt-auto shrink-0 border-t">
       <div className="mx-auto max-w-7xl px-6 py-12 md:py-16">
         <div className="flex flex-col gap-10 md:flex-row md:items-start md:justify-between md:gap-12 lg:gap-20">
           {/* Brand */}
@@ -122,7 +122,7 @@ export default function Footer() {
             <Link
               href="/"
               aria-label="Mesozoic Isle home"
-              className="text-primary focus-visible:ring-ring focus-visible:ring-offset-background inline-flex w-fit rounded-sm transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              className="text-primary dark:text-white focus-visible:ring-ring focus-visible:ring-offset-background inline-flex w-fit rounded-sm transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
             >
               <span className="inline-flex flex-col items-center leading-none">
                 <span className="font-heading text-[1.45rem] font-semibold tracking-[0.32em] lg:text-[1.6rem]">
@@ -144,7 +144,7 @@ export default function Footer() {
               </span>
             </Link>
 
-            <p className="text-muted max-w-xs text-sm leading-relaxed">
+            <p className="text-muted dark:text-white/70 max-w-xs text-sm leading-relaxed">
               Prehistoric adventures across accommodation, attractions, and
               curated island experiences.
             </p>
