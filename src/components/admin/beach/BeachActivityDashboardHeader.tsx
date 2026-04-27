@@ -5,6 +5,7 @@ import { PencilIcon, Trash2Icon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/auth-context";
+import { resolveImage } from "@/lib/imageSrc";
 import type { BeachActivity } from "@/types/booking";
 
 type Props = {
@@ -29,12 +30,14 @@ export function BeachActivityDashboardHeader({
   const canEdit = hasPermission("beach.update");
   const canDelete = hasPermission("beach.delete");
 
+  const coverImage = resolveImage(activity);
+
   return (
     <div className="flex flex-col gap-4">
-      {activity.image ? (
+      {coverImage ? (
         <div className="relative h-48 w-full overflow-hidden rounded-xl border">
           <Image
-            src={activity.image}
+            src={coverImage}
             alt={activity.name}
             fill
             sizes="(max-width: 1024px) 100vw, 1024px"

@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { MapPin } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { FALLBACK_IMAGE, resolveImage } from "@/lib/imageSrc";
 import type { Hotel } from "@/types/booking";
 
-const FALLBACK_IMAGE = "/img/banner.avif";
 const VISIBLE_AMENITIES = 4;
 
 interface HotelCardProps {
@@ -23,7 +23,7 @@ export function HotelCard({ hotel }: HotelCardProps) {
     >
       <Card className="h-full flex flex-col overflow-hidden transition-shadow group-hover:shadow-lg">
         <img
-          src={hotel.image || FALLBACK_IMAGE}
+          src={resolveImage(hotel) || FALLBACK_IMAGE}
           alt={hotel.name}
           className="w-full h-48 object-cover"
         />

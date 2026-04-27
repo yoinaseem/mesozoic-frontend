@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { FALLBACK_IMAGE, resolveImage } from "@/lib/imageSrc";
 import type { RoomType } from "@/types/booking";
 
 type RoomCardProps = {
@@ -18,7 +19,7 @@ export function RoomCard({ roomType }: RoomCardProps) {
     <article className="card flex flex-col overflow-hidden">
       <div className="relative h-44 w-full overflow-hidden rounded-lg">
         <Image
-          src={roomType.image ?? "/img/banner.avif"}
+          src={resolveImage(roomType) ?? FALLBACK_IMAGE}
           alt={roomType.name}
           fill
           sizes="(max-width: 768px) 100vw, 33vw"

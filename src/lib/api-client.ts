@@ -151,3 +151,50 @@ export async function apiRequest<T>(
 
   return responseData as T;
 }
+
+type ApiUploadOptions = {
+  method?: "POST" | "PUT" | "PATCH";
+  headers?: HeadersInit;
+  skipAuth?: boolean;
+  tokenOverride?: string | null;
+};
+
+// Multipart sibling of apiRequest. Browser sets the Content-Type (with the
+// boundary) automatically when the body is FormData — never set it ourselves.
+export async function apiUpload<T>(
+  path: string,
+  formData: FormData,
+  options: ApiUploadOptions = {},
+): Promise<T> {
+  const urlPath = path.startsWith("/") ? path : `/${path}`;
+  const url = `${API_BASE_URL}${urlPath}`;
+
+  const headers = new Headers(options.headers);
+  headers.set("Accept", "application/json");
+  headers.delete("Content-Type");
+
+  const token = options.tokenOverride ?? apiClientConfig.getToken();
+  if (!options.skipAuth && token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(url, {
+    method: options.method ?? "POST",
+    headers,
+    body: formData,
+  });
+
+  const contentType = response.headers.get("content-type") ?? "";
+  const responseData = contentType.includes("application/json")
+    ? await response.json()
+    : null;
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      apiClientConfig.onUnauthorized();
+    }
+    throw new ApiError(response.status, responseData);
+  }
+
+  return responseData as T;
+}

@@ -1,14 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
+import { FALLBACK_IMAGE, resolveImage } from "@/lib/imageSrc";
 import type { BeachActivity } from "@/types/booking";
-
-const FALLBACK_IMAGES = [
-  "https://images.unsplash.com/photo-1506953823976-52e1fdc0149a?q=80&w=800",
-  "https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=800",
-  "https://images.unsplash.com/photo-1500514966906-fe245eea9344?q=80&w=800",
-  "https://images.unsplash.com/photo-1501555088652-021faa106b9b?q=80&w=800",
-  "https://images.unsplash.com/photo-1559628376-f3fe5f782a2e?q=80&w=800",
-  "https://images.unsplash.com/photo-1530053969600-caed2596d242?q=80&w=800",
-];
 
 interface BeachActivityCardProps {
   activity: BeachActivity;
@@ -28,7 +20,7 @@ export const BeachActivityCard = ({ activity }: BeachActivityCardProps) => {
   return (
     <Card className="h-full flex flex-col overflow-hidden">
       <img
-        src={activity.image || FALLBACK_IMAGES[(activity.id - 1) % FALLBACK_IMAGES.length]}
+        src={resolveImage(activity) || FALLBACK_IMAGE}
         alt={activity.name}
         className="w-full h-48 object-cover"
       />

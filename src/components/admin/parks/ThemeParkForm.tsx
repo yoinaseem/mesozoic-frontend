@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { FormField } from "@/components/admin/FormField";
 import { FormPage } from "@/components/admin/FormPage";
-import { TagInput } from "@/components/admin/TagInput";
+import { ImageDropzoneMulti } from "@/components/admin/ImageDropzoneMulti";
 import { useFieldErrors } from "@/components/admin/useFieldErrors";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -276,15 +276,17 @@ export function ThemeParkForm({ mode }: ThemeParkFormProps) {
       </div>
 
       <FormField
-        label="Image URLs"
+        label="Cover images"
         name="images"
         errors={fieldErrors}
-        helper="Optional. Add one or more cover image URLs."
+        helper="Optional. JPEG, PNG, WEBP, or GIF up to 10 MB each."
       >
-        <TagInput
+        <ImageDropzoneMulti
           value={form.images}
           onChange={(next) => setField("images", next)}
-          placeholder="https://... and press Enter"
+          folder="theme-parks"
+          initialValue={snapshot.images}
+          initialPreviewUrls={mode.initial?.image_urls ?? undefined}
         />
       </FormField>
     </FormPage>

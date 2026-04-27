@@ -1,4 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
+import { FALLBACK_IMAGE, resolveImage } from "@/lib/imageSrc";
 
 export interface ParkActivityCardData {
   id: number;
@@ -8,21 +9,13 @@ export interface ParkActivityCardData {
   duration?: number | null;
   max_capacity?: number | null;
   image?: string | null;
+  image_url?: string | null;
   imageUrl?: string | null;
 }
 
 interface ParkActivityCardProps {
   activity: ParkActivityCardData;
 }
-
-const FALLBACK_IMAGES = [
-  "https://images.unsplash.com/photo-1615632134011-b2f62e6fe2df?q=80&w=800",
-  "https://images.unsplash.com/photo-1578662996442-48f60103fc96?q=80&w=800",
-  "https://images.unsplash.com/photo-1516426122078-c23e76319801?q=80&w=800",
-  "https://images.unsplash.com/photo-1448375240586-882707db888b?q=80&w=800",
-  "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=800",
-  "https://images.unsplash.com/photo-1504893524553-b855bce32c67?q=80&w=800",
-];
 
 export function ParkActivityCard({ activity }: ParkActivityCardProps) {
   const formatPrice = (price: number | null | undefined) =>
@@ -39,9 +32,7 @@ export function ParkActivityCard({ activity }: ParkActivityCardProps) {
   };
 
   const imageSrc =
-    activity.imageUrl ||
-    activity.image ||
-    FALLBACK_IMAGES[(activity.id - 1) % FALLBACK_IMAGES.length];
+    activity.imageUrl || resolveImage(activity) || FALLBACK_IMAGE;
 
   return (
     <Card className="h-full flex flex-col overflow-hidden">

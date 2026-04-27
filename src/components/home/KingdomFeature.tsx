@@ -1,15 +1,16 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { FALLBACK_IMAGE, resolveImage } from "@/lib/imageSrc";
 import type { ParkActivity } from "@/types/booking";
-
-const FALLBACK = "/img/banner.avif";
 
 interface KingdomFeatureProps {
   activities: ParkActivity[];
 }
 
 export function KingdomFeature({ activities }: KingdomFeatureProps) {
-  const heroImage = activities.find((a) => a.image)?.image || FALLBACK;
+  const heroImage =
+    activities.map((a) => resolveImage(a)).find((src) => Boolean(src)) ||
+    FALLBACK_IMAGE;
 
   return (
     <section className="bg-base border-base border-t py-20 md:py-24">

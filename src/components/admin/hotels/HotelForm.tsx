@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { FormField } from "@/components/admin/FormField";
 import { FormPage } from "@/components/admin/FormPage";
+import { ImageDropzone } from "@/components/admin/ImageDropzone";
 import { TagInput } from "@/components/admin/TagInput";
 import { useFieldErrors } from "@/components/admin/useFieldErrors";
 import { Input } from "@/components/ui/input";
@@ -184,16 +185,17 @@ export function HotelForm({ mode }: HotelFormProps) {
       </FormField>
 
       <FormField
-        label="Image URL"
+        label="Cover image"
         name="image"
         errors={fieldErrors}
-        helper="Optional. Paste a full URL to a cover image."
+        helper="Optional. JPEG, PNG, WEBP, or GIF up to 10 MB."
       >
-        <Input
-          type="url"
-          placeholder="https://..."
-          value={form.image}
-          onChange={(event) => setField("image", event.target.value)}
+        <ImageDropzone
+          value={form.image || null}
+          onChange={(next) => setField("image", next ?? "")}
+          folder="hotels"
+          initialValue={snapshot.image || null}
+          initialPreviewUrl={mode.initial?.image_url ?? null}
         />
       </FormField>
     </FormPage>

@@ -10,6 +10,7 @@ export type RoomType = {
   name: string;
   description: string | null;
   image: string | null;
+  image_url?: string | null;
   capacity: number | null;
   price: string | null;
   amenities: string[] | null;
@@ -35,6 +36,7 @@ export type Hotel = {
   description: string | null;
   amenities: string[] | null;
   image: string | null;
+  image_url?: string | null;
   room_types?: RoomType[];
   created_at: string;
   updated_at: string;
@@ -51,6 +53,7 @@ export type FerryType = {
   name: string;
   description: string | null;
   image: string | null;
+  image_url?: string | null;
   capacity: number;
   price: number;
   ferries?: Ferry[];
@@ -113,6 +116,7 @@ export type BeachActivity = {
   capacity: number;
   duration: number;
   image: string | null;
+  image_url?: string | null;
   schedules?: BeachActivitySchedule[];
   schedules_count?: number;
   created_at: string;
@@ -157,6 +161,7 @@ export type ThemePark = {
   id: number;
   name: string;
   images: string[] | null;
+  image_urls?: string[] | null;
   description: string | null;
   capacity: number | null;
   price: number | null;
@@ -186,6 +191,7 @@ export type ParkActivity = {
   description: string | null;
   price: number | null;
   image: string | null;
+  image_url?: string | null;
   duration: number | null;
   max_capacity: number | null;
   is_all_day: boolean;

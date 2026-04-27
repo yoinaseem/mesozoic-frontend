@@ -5,7 +5,8 @@ import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-const PLACEHOLDER = "/img/banner.avif";
+const PLACEHOLDER =
+  "https://sites.duke.edu/dek23/wp-content/themes/koji/assets/images/default-fallback-image.png";
 
 const SLIDES = [
   {
@@ -39,10 +40,9 @@ export function MomentsCarousel() {
   const autoplay = useRef(
     Autoplay({ delay: 5000, stopOnInteraction: false, stopOnMouseEnter: true }),
   );
-  const [emblaRef, emblaApi] = useEmblaCarousel(
-    { loop: true },
-    [autoplay.current],
-  );
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true }, [
+    autoplay.current,
+  ]);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);

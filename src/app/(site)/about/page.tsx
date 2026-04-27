@@ -14,7 +14,8 @@ import { PlanCta } from "@/components/home/PlanCta";
 
 export const metadata: Metadata = {
   title: "About Us | Mesozoic Isle",
-  description: "Learn about Mesozoic Isle, our story, mission, and guest experience.",
+  description:
+    "Learn about Mesozoic Isle, our story, mission, and guest experience.",
 };
 
 export default function AboutPage() {
@@ -44,23 +45,32 @@ export default function AboutPage() {
                 MESOZOIC ISLE
               </span>
               <span className="mt-4 inline-flex items-center justify-center gap-3">
-                <span className="h-px w-12 bg-accent opacity-90 sm:w-16" aria-hidden />
+                <span
+                  className="h-px w-12 bg-accent opacity-90 sm:w-16"
+                  aria-hidden
+                />
                 <span className="font-heading text-accent text-sm font-semibold tracking-[0.34em] sm:text-base">
                   AN ISLAND STORY
                 </span>
-                <span className="h-px w-12 bg-accent opacity-90 sm:w-16" aria-hidden />
+                <span
+                  className="h-px w-12 bg-accent opacity-90 sm:w-16"
+                  aria-hidden
+                />
               </span>
             </h1>
-
           </div>
         </div>
       </section>
 
-      <section className="border-base border-t bg-primary-deep py-14 md:py-16" aria-label="Our story">
+      <section
+        className="border-base border-t bg-primary-deep py-14 md:py-16"
+        aria-label="Our story"
+      >
         <div className="mx-auto max-w-7xl px-4 md:px-6">
           <div className="grid gap-3 lg:gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-center">
             <div className="group/story relative aspect-4/3 w-full overflow-hidden rounded-3xl border border-white/20 shadow-md lg:aspect-5/6">
               <Image
+                // UPDATE
                 src="/img/banner.avif"
                 alt="Island Arrival"
                 fill
@@ -83,7 +93,10 @@ export default function AboutPage() {
                   wonder &amp; adventure.
                 </span>
               </h2>
-              <div className="mt-5 h-1 w-20 rounded-full bg-accent" aria-hidden />
+              <div
+                className="mt-5 h-1 w-20 rounded-full bg-accent"
+                aria-hidden
+              />
 
               <div className="mt-6 space-y-5 text-base leading-relaxed text-white/90 md:text-lg">
                 <p>
@@ -99,12 +112,14 @@ export default function AboutPage() {
                 </p>
               </div>
             </div>
-
           </div>
         </div>
       </section>
 
-      <section className="border-base border-t bg-base py-20 md:py-24" aria-label="Our vision and mission">
+      <section
+        className="border-base border-t bg-base py-20 md:py-24"
+        aria-label="Our vision and mission"
+      >
         <div className="mx-auto grid max-w-7xl grid-cols-1 gap-12 px-6 lg:grid-cols-2 lg:items-center lg:gap-16">
           <div>
             <p className="text-primary text-sm font-semibold uppercase tracking-[0.28em]">
@@ -116,18 +131,21 @@ export default function AboutPage() {
                 means to us.
               </span>
             </h2>
-            <div className="bg-primary mt-5 h-1 w-20 rounded-full" aria-hidden />
+            <div
+              className="bg-primary mt-5 h-1 w-20 rounded-full"
+              aria-hidden
+            />
 
             <div className="mt-8 space-y-5">
               <p className="text-base-color text-base leading-relaxed md:text-lg">
-                To be the world&apos;s most memorable adventure island — a
-                place where every guest experiences wonder, safety, and
-                world-class hospitality in one seamless journey.
+                To be the world&apos;s most memorable adventure island — a place
+                where every guest experiences wonder, safety, and world-class
+                hospitality in one seamless journey.
               </p>
               <p className="text-base-color text-base leading-relaxed md:text-lg">
                 We deliver curated experiences that blend thrill, comfort, and
-                care. From first booking to final checkout, every touchpoint
-                is transparent, guest-first, and built for memorable moments.
+                care. From first booking to final checkout, every touchpoint is
+                transparent, guest-first, and built for memorable moments.
               </p>
             </div>
           </div>
@@ -135,6 +153,7 @@ export default function AboutPage() {
           <div className="group/depth relative aspect-4/3 w-full perspective-[1400px] lg:aspect-5/4">
             <div className="absolute inset-0 overflow-hidden rounded-2xl shadow-xl ring-1 ring-black/5">
               <Image
+                // UPDATE
                 src="/img/banner.avif"
                 alt="A panoramic glimpse of Mesozoic Isle"
                 fill
@@ -150,7 +169,10 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="relative border-base border-t bg-primary-deep py-20 md:py-24" aria-label="Our team">
+      <section
+        className="relative border-base border-t bg-primary-deep py-20 md:py-24"
+        aria-label="Our team"
+      >
         <div className="mx-auto max-w-7xl px-6">
           <p className="text-white/75 text-sm font-semibold uppercase tracking-[0.28em]">
             Our Team

@@ -11,6 +11,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/auth-context";
+import { resolveImages } from "@/lib/imageSrc";
 import type { ThemePark } from "@/types/booking";
 
 type ParkDashboardHeaderProps = {
@@ -31,7 +32,7 @@ export function ParkDashboardHeader({
   const canEdit = hasPermission("park.update");
   const canDelete = hasPermission("park.delete");
 
-  const coverImage = park.images?.[0] ?? null;
+  const coverImage = resolveImages(park)[0] ?? null;
 
   return (
     <div className="flex flex-col gap-4">

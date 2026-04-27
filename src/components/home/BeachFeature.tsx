@@ -1,13 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { FALLBACK_IMAGE, resolveImage } from "@/lib/imageSrc";
 import type { BeachActivity } from "@/types/booking";
-
-const FALLBACK = "/img/banner.avif";
-const BEACH_FALLBACKS = [
-  "https://images.unsplash.com/photo-1506953823976-52e1fdc0149a?q=80&w=800",
-  "https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=800",
-  "https://images.unsplash.com/photo-1500514966906-fe245eea9344?q=80&w=800",
-];
 
 interface BeachFeatureProps {
   activities: BeachActivity[];
@@ -16,7 +10,7 @@ interface BeachFeatureProps {
 export function BeachFeature({ activities }: BeachFeatureProps) {
   const featured = activities[0];
   const tiles = activities.slice(1, 4);
-  const heroImage = featured?.image || FALLBACK;
+  const heroImage = (featured && resolveImage(featured)) || FALLBACK_IMAGE;
 
   return (
     <section className="bg-primary-deep border-base border-t py-20 md:py-24">
@@ -29,10 +23,7 @@ export function BeachFeature({ activities }: BeachFeatureProps) {
             <h2 className="font-heading mt-6 text-4xl font-bold leading-tight text-white md:text-5xl">
               Where the sea calls.
             </h2>
-            <div
-              className="bg-accent mt-4 h-1 w-20 rounded-full"
-              aria-hidden
-            />
+            <div className="bg-accent mt-4 h-1 w-20 rounded-full" aria-hidden />
             <p className="mt-6 text-lg font-bold leading-relaxed text-white/90">
               Snorkel the reefs, race the wind on a board, or drift beneath
               sunset skies. The island&apos;s beaches are alive with guided
@@ -48,16 +39,13 @@ export function BeachFeature({ activities }: BeachFeatureProps) {
 
             <ul className="mt-10 grid grid-cols-3 gap-3">
               {tiles.length > 0
-                ? tiles.map((tile, i) => (
+                ? tiles.map((tile) => (
                     <li
                       key={tile.id}
                       className="group/depth relative aspect-square overflow-hidden rounded-lg shadow-md perspective-[1000px]"
                     >
                       <img
-                        src={
-                          tile.image ||
-                          BEACH_FALLBACKS[i % BEACH_FALLBACKS.length]
-                        }
+                        src={resolveImage(tile) || FALLBACK_IMAGE}
                         alt={tile.name}
                         className="h-full w-full object-cover transition-transform duration-700 ease-out will-change-transform transform-[scale(1.05)_rotateX(0deg)_rotateY(0deg)] group-hover/depth:transform-[scale(1.12)_rotateX(0.8deg)_rotateY(-2deg)] group-active/depth:transform-[scale(1.12)_rotateX(0.8deg)_rotateY(-2deg)]"
                       />
@@ -70,13 +58,13 @@ export function BeachFeature({ activities }: BeachFeatureProps) {
                       </span>
                     </li>
                   ))
-                : BEACH_FALLBACKS.map((src, i) => (
+                : Array.from({ length: 3 }).map((_, i) => (
                     <li
                       key={i}
                       className="group/depth aspect-square overflow-hidden rounded-lg shadow-md perspective-[1000px]"
                     >
                       <img
-                        src={src}
+                        src={FALLBACK_IMAGE}
                         alt="Beach activity"
                         className="h-full w-full object-cover transition-transform duration-700 ease-out will-change-transform transform-[scale(1.05)_rotateX(0deg)_rotateY(0deg)] group-hover/depth:transform-[scale(1.12)_rotateX(0.8deg)_rotateY(-2deg)] group-active/depth:transform-[scale(1.12)_rotateX(0.8deg)_rotateY(-2deg)]"
                       />

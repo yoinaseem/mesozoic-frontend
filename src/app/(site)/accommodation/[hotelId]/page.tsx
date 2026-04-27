@@ -4,10 +4,9 @@ import { notFound } from "next/navigation";
 import { ChevronLeft, MapPin } from "lucide-react";
 import { RoomCard } from "@/components/rooms/RoomCard";
 import { fetchHotel } from "@/lib/api/server/hotels";
+import { FALLBACK_IMAGE, resolveImage } from "@/lib/imageSrc";
 
 export const revalidate = 300;
-
-const FALLBACK_IMAGE = "/img/banner.avif";
 
 type PageProps = {
   params: Promise<{ hotelId: string }>;
@@ -45,7 +44,7 @@ export default async function HotelDetailsPage({ params }: PageProps) {
       <section className="relative">
         <div className="relative h-72 md:h-96 w-full overflow-hidden">
           <img
-            src={hotel.image || FALLBACK_IMAGE}
+            src={resolveImage(hotel) || FALLBACK_IMAGE}
             alt={hotel.name}
             className="w-full h-full object-cover"
           />

@@ -5,6 +5,7 @@ import { PencilIcon, Trash2Icon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/auth-context";
+import { resolveImage } from "@/lib/imageSrc";
 import type { Hotel } from "@/types/booking";
 
 type HotelDashboardHeaderProps = {
@@ -22,12 +23,14 @@ export function HotelDashboardHeader({
   const canEdit = hasPermission("hotels.update");
   const canDelete = hasPermission("hotels.delete");
 
+  const coverImage = resolveImage(hotel);
+
   return (
     <div className="flex flex-col gap-4">
-      {hotel.image ? (
+      {coverImage ? (
         <div className="relative h-48 w-full overflow-hidden rounded-xl border">
           <Image
-            src={hotel.image}
+            src={coverImage}
             alt={hotel.name}
             fill
             sizes="(max-width: 1024px) 100vw, 1024px"
