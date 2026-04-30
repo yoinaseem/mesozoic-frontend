@@ -186,7 +186,7 @@ function CheckoutInner() {
     consumeSubmitResult(result);
 
     if (result.errors.length === 0 && result.reservationId !== null) {
-      toast.success("Trip booked. See your dashboard for the details.");
+      toast.success("Booking success");
       reset();
       router.push("/dashboard");
       return;

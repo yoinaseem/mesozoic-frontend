@@ -176,19 +176,28 @@ export function ParkActivityStep() {
     };
   }, [effectiveParkId, selectedActivityId]);
 
-  // When the day-pass changes, drop activity/schedule selection — old
-  // park context's activities aren't relevant anymore. Render-time
-  // setState pattern (React's recommended alternative to a setState
-  // useEffect for "adjust state when context changes"); the loaded
-  // arrays clear so the picker doesn't briefly flash the previous
-  // park's activities while the new fetch lands.
+  // Activities are park-scoped, not pass-scoped. Invalidate them only when
+  // the park id actually changes — switching between two day-passes for the
+  // SAME park (e.g. different dates) keeps the cached list. Without this
+  // split, clearing `loadedActivitiesFor` on every pass switch left the
+  // picker stuck on "Loading…" forever, because the fetch effect's dep is
+  // [effectiveParkId] and same-park switches don't re-fire it.
+  const [prevParkId, setPrevParkId] = useState(effectiveParkId);
+  if (effectiveParkId !== prevParkId) {
+    setPrevParkId(effectiveParkId);
+    setActivities([]);
+    setLoadedActivitiesFor(null);
+  }
+
+  // When the day-pass changes, drop the in-progress selection — old pass's
+  // activity/schedule isn't valid against the new pass's date or guest cap.
+  // Schedules are activity+park scoped, so they invalidate naturally when
+  // selectedActivityId clears here.
   const [prevPassKey, setPrevPassKey] = useState(selectedPassKey);
   if (selectedPassKey !== prevPassKey) {
     setPrevPassKey(selectedPassKey);
     setSelectedActivityId(null);
     setSelectedScheduleId(null);
-    setActivities([]);
-    setLoadedActivitiesFor(null);
     setSchedules([]);
     setLoadedSchedulesFor(null);
     setError(null);
